@@ -1,35 +1,36 @@
-import { signInWithEmail, signInWithGoogle } from "@/lib/auth/actions";
+import Link from "next/link";
+import { signInWithPassword, signUp } from "@/lib/auth/actions";
 
-export const metadata = { title: "Đăng nhập · Tossful" };
+export const metadata = { title: "Dang nhap - Tossful" };
 
 export default function LoginPage({
   searchParams,
 }: {
-  searchParams: { sent?: string; error?: string };
+  searchParams: { mode?: string; error?: string };
 }) {
-  const sent = searchParams.sent === "1";
+  const isSignup = searchParams.mode === "signup";
   const error = searchParams.error;
+  const action = isSignup ? signUp : signInWithPassword;
+  const title = isSignup ? "Tao tai khoan" : "Dang nhap";
+  const buttonLabel = isSignup ? "Tao tai khoan" : "Dang nhap";
 
   return (
     <main className="min-h-screen flex items-center justify-center p-6">
       <div className="w-full max-w-sm bg-white border border-kale-100 rounded-2xl p-8 shadow-sm">
-        <h1 className="font-display text-3xl text-kale-700 mb-2">Đăng nhập</h1>
+        <h1 className="font-display text-3xl text-kale-700 mb-2">{title}</h1>
         <p className="text-sm text-kale-600 mb-6">
-          Lưu salad của bạn và lên kế hoạch cho cả tuần.
+          {isSignup
+            ? "Tao tai khoan de luu bowl va len ke hoach cho ca tuan."
+            : "Luu salad cua ban va len ke hoach cho ca tuan."}
         </p>
 
-        {sent && (
-          <div className="mb-4 p-3 bg-kale-50 text-kale-700 rounded-lg text-sm">
-            Đã gửi link đăng nhập đến email của bạn. Kiểm tra hộp thư nhé.
-          </div>
-        )}
         {error && (
           <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm">
             {error}
           </div>
         )}
 
-        <form action={signInWithEmail} className="space-y-3">
+        <form action={action} className="space-y-3">
           <input
             name="email"
             type="email"
@@ -37,28 +38,39 @@ export default function LoginPage({
             placeholder="email@cua-ban.com"
             className="w-full px-4 py-3 border border-kale-200 rounded-lg focus:outline-none focus:border-kale-500"
           />
+          <input
+            name="password"
+            type="password"
+            required
+            minLength={isSignup ? 8 : undefined}
+            placeholder={isSignup ? "Mat khau (it nhat 8 ky tu)" : "Mat khau"}
+            className="w-full px-4 py-3 border border-kale-200 rounded-lg focus:outline-none focus:border-kale-500"
+          />
           <button
             type="submit"
             className="w-full bg-kale-700 text-white py-3 rounded-lg font-medium hover:bg-kale-800 transition"
           >
-            Gửi link đăng nhập
+            {buttonLabel}
           </button>
         </form>
 
-        <div className="flex items-center my-5 text-xs text-kale-400">
-          <span className="flex-1 border-t border-kale-100" />
-          <span className="px-3">hoặc</span>
-          <span className="flex-1 border-t border-kale-100" />
+        <div className="mt-5 text-center text-sm text-kale-600">
+          {isSignup ? (
+            <>
+              Da co tai khoan?{" "}
+              <Link href="/login" className="text-kale-700 underline">
+                Dang nhap
+              </Link>
+            </>
+          ) : (
+            <>
+              Chua co tai khoan?{" "}
+              <Link href="/login?mode=signup" className="text-kale-700 underline">
+                Tao tai khoan moi
+              </Link>
+            </>
+          )}
         </div>
-
-        <form action={signInWithGoogle}>
-          <button
-            type="submit"
-            className="w-full border border-kale-200 py-3 rounded-lg font-medium hover:bg-kale-50 transition"
-          >
-            Tiếp tục với Google
-          </button>
-        </form>
       </div>
     </main>
   );
