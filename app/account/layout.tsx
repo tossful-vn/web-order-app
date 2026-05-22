@@ -2,10 +2,6 @@ import { requireUser } from "@/lib/auth/require-user";
 import { signOut } from "@/lib/auth/actions";
 import Link from "next/link";
 
-/**
- * Auth-required wrapper for /account/*.
- * requireUser() redirects to /login if no session.
- */
 export default async function AccountLayout({
   children,
 }: {
@@ -51,6 +47,12 @@ export default async function AccountLayout({
               className="py-3 border-b-2 border-transparent hover:border-kale-300 text-kale-700"
             >
               Hồ sơ
+            </Link>
+            <Link
+              href="/account/password"
+              className="py-3 border-b-2 border-transparent hover:border-kale-300 text-kale-700"
+            >
+              Đổi mật khẩu
             </Link>
           </nav>
         </div>
