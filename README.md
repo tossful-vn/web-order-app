@@ -40,11 +40,23 @@ lib/
     server.ts           Server-side Supabase client (with cookies)
 ```
 
-## Build phases
+## Build steps
 
-- **Phase 1** (current) — skeleton + deploy pipeline ✅
-- Phase 2 — Auth (signup/login, my-orders, saved addresses)
-- Phase 3 — Menu + cart + checkout (no payment)
-- Phase 4 — MoMo + VNPay integration
-- Phase 5 — Kitchen view + order tracking
-- Phase 6 — Polish + soft launch
+> **Naming note.** The numbered items below are *internal build steps inside this codebase*. They are **not** the master web roadmap phases. The canonical phase map lives in the project memory `tossful-web-roadmap` and is:
+>
+> - **Phase 1** — Nutrition Calculator (shipped)
+> - **Phase 2** — Membership + Build Your Week ← *we are building this now*
+> - **Phase 3** — Separate web order app (BYW + B2B, prepayment only)
+> - **Phase 4** — Full iPOS integration (parked)
+>
+> The steps below are the chronological work-units inside this Next.js app:
+
+- **Step 0** — skeleton + deploy pipeline ✅
+- **Step 1** *(Phase 2 → in progress)* — Supabase Auth: email magic link + Google OAuth
+- **Step 2** *(Phase 2)* — `/account` profile + saved bowls
+- **Step 3** *(Phase 2)* — `/byw` Build Your Week + `/byw/reserve` soft pre-order intent
+- **Step 4** *(Phase 2)* — migrate `/nutrition` calculator off Netlify into this app
+- **Step 5** *(Phase 3)* — `/order` catalog (BYW + B2B SKUs)
+- **Step 6** *(Phase 3)* — `/order/checkout` with MoMo + VNPay
+- **Step 7** *(Phase 3)* — `/kitchen` scheduled-orders view
+- **Step 8** — `/admin` for Hieu + TA to manage menu/orders
