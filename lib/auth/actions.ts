@@ -6,12 +6,16 @@ import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 
 /**
- * Send a magic link to the supplied email. Supabase emails the link;
- * clicking it lands on /auth/callback which exchanges the code for a session.
+ * Form actions: return Promise<void>. On success redirect; on error redirect
+ * back with an ?error query string. This matches Next.js's form action
+ * contract (must return void/Promise<void>).
  */
-export async function signInWithEmail(formData: FormData) {
+
+export async function signInWithEmail(formData: FormData): Promise<void> {
   const email = String(formData.get("email") ?? "").trim();
-  if (!email) return { error: "Vui lòng nhập email." };
+  if (!email) {
+    redirect("/login?error=" + encodeURIComponent("Vui lòng nhập email."));
+  }
 
   const supabase = createClient();
   const origin = headers().get("origin") ?? "https://order.tossful.vn";
@@ -21,15 +25,13 @@ export async function signInWithEmail(formData: FormData) {
     options: { emailRedirectTo: `${origin}/auth/callback` },
   });
 
-  if (error) return { error: error.message };
-  return { ok: true };
+  if (error) {
+    redirect("/login?error=" + encodeURIComponent(error.message));
+  }
+  redirect("/login?sent=1");
 }
 
-/**
- * Begin a Google OAuth flow. Supabase redirects to Google, then back to
- * /auth/callback with a code to exchange.
- */
-export async function signInWithGoogle() {
+export async function signInWithGoogle(): Promise<void> {
   const supabase = createClient();
   const origin = headers().get("origin") ?? "https://order.tossful.vn";
 
@@ -38,14 +40,11 @@ export async function signInWithGoogle() {
     options: { redirectTo: `${origin}/auth/callback` },
   });
 
-  if (error) return { error: error.message };
-  if (data?.url) redirect(data.url);
-  return { ok: true };
-}
-
-export async function signOut() {
-  const supabase = createClient();
-  await supabase.auth.signOut();
-  revalidatePath("/", "layout");
-  redirect("/");
-}
+  if (error) {
+    redirect("/login?error=" + encodeURIComponent(error.message));
+  }
+  if (data?.url) {
+    redirect(data.url);
+  }
+  redirect(
+    "/login?error=" + encodeURIComponent("Không tạo được phiên đăng 
