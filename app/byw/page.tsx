@@ -25,7 +25,7 @@ export default async function BywPage() {
     .limit(1)
     .maybeSingle();
 
-  const filled = 0; // Step 3 will sum from week_slots
+  const filled: number = 0; // Step 3 will sum from week_slots
   const ready = filled === 7;
 
   return (
