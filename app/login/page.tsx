@@ -4,6 +4,7 @@ import {
   signUp,
   requestPasswordReset,
 } from "@/lib/auth/actions";
+import PasswordField from "./PasswordField.client";
 
 export const metadata = { title: "Đăng nhập · Tossful" };
 
@@ -76,15 +77,16 @@ export default function LoginPage({
             className="w-full px-4 py-3 border border-kale-200 rounded-lg focus:outline-none focus:border-kale-500"
           />
           {!isForgot && (
-            <input
+            <PasswordField
               name="password"
-              type="password"
               required
               minLength={isSignup ? 8 : undefined}
               placeholder={
                 isSignup ? "Mật khẩu (ít nhất 8 ký tự)" : "Mật khẩu"
               }
-              className="w-full px-4 py-3 border border-kale-200 rounded-lg focus:outline-none focus:border-kale-500"
+              autoComplete={isSignup ? "new-password" : "current-password"}
+              showLabel="Hiện mật khẩu"
+              hideLabel="Ẩn mật khẩu"
             />
           )}
           <button
