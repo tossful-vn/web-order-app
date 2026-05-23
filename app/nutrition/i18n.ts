@@ -17,6 +17,14 @@ export type StringTable = {
   bowl_name_placeholder: string;
   bowl_name_hint: string;
   saving: string;
+  choose_q: string;
+  start_sig: string;
+  start_sig_desc: string;
+  start_byo: string;
+  start_byo_desc: string;
+  back_to_start: string;
+  browse_h: string;
+  browse_sub: string;
   start_from_bowl: string; pick_any: string;
   cat_Base: string; cat_Topping: string; cat_Premium: string; cat_Dressing: string; cat_Free: string;
   save_header_named: string; save_header_anon: string;
@@ -59,6 +67,14 @@ const EN: StringTable = {
   bowl_name_placeholder: "Bowl name",
   bowl_name_hint: "Auto-named from your ingredients — tap to edit",
   saving: "Saving...",
+  choose_q: "How would you like to start?",
+  start_sig: "Start from a signature",
+  start_sig_desc: "Browse 7 Tossful recipes, then customise",
+  start_byo: "Build from scratch",
+  start_byo_desc: "Pick ingredients one at a time",
+  back_to_start: "Back to start",
+  browse_h: "Pick a signature",
+  browse_sub: "Tap a bowl to load it, then tweak in the next step.",
   start_from_bowl: "Start from this bowl",
   pick_any: "pick any",
   cat_Base: "Base", cat_Topping: "Toppings", cat_Premium: "Premium protein",
@@ -161,6 +177,14 @@ const VI_macros_label = "Dinh dưỡng";
 const VI_language_label = "Ngôn ngữ";
 const VI_source_label = "Nguồn";
 const VI_empty_alert = "Chưa có gì trong tô — chọn vài nguyên liệu nhé.";
+const VI_choose_q = "Bạn muốn bắt đầu thế nào?";
+const VI_start_sig = "Bắt đầu với tô signature";
+const VI_start_sig_desc = "Xem 7 công thức Tossful rồi tùy chỉnh";
+const VI_start_byo = "Tự tạo từ đầu";
+const VI_start_byo_desc = "Chọn từng nguyên liệu";
+const VI_back_to_start = "Quay lại";
+const VI_browse_h = "Chọn một tô signature";
+const VI_browse_sub = "Chạm vào một tô để nạp, sau đó tùy chỉnh ở bước tiếp theo.";
 const VI_save_tip = "Mẹo: chụp màn hình để lưu hoặc chia sẻ. Cảm ơn bạn đã thử Tossful!";
 
 const VI: StringTable = {
@@ -177,6 +201,14 @@ const VI: StringTable = {
   bowl_name_placeholder: VI_bowl_name_placeholder,
   bowl_name_hint: VI_bowl_name_hint,
   saving: VI_saving,
+  choose_q: VI_choose_q,
+  start_sig: VI_start_sig,
+  start_sig_desc: VI_start_sig_desc,
+  start_byo: VI_start_byo,
+  start_byo_desc: VI_start_byo_desc,
+  back_to_start: VI_back_to_start,
+  browse_h: VI_browse_h,
+  browse_sub: VI_browse_sub,
   start_from_bowl: VI_start_from_bowl, pick_any: VI_pick_any,
   cat_Base: "Base", cat_Topping: "Topping", cat_Premium: "Premium",
   cat_Dressing: "Dressing", cat_Free: "Free",

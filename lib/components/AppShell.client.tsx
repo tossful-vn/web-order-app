@@ -13,6 +13,8 @@ const VI = {
   account_label: "Tài khoản",
   profile: "Hồ sơ",
   password: "Đổi mật khẩu",
+  help_label: "Hỗ trợ",
+  feedback: "Gửi góp ý",
   prefs_label: "Tùy chỉnh",
   language: "Ngôn ngữ",
   signout: "Đăng xuất",
@@ -31,6 +33,8 @@ const EN = {
   account_label: "Account",
   profile: "Profile",
   password: "Change password",
+  help_label: "Help",
+  feedback: "Send feedback",
   prefs_label: "Preferences",
   language: "Language",
   signout: "Sign out",
@@ -226,6 +230,20 @@ export default function AppShell({ user, children }: Props) {
               </button>
             </div>
           </div>
+
+          <div className="border-t border-kale-100 my-2" />
+
+          <div className="text-[10px] text-kale-400 uppercase tracking-widest px-5 pt-3 pb-2 font-medium">
+            {str.help_label}
+          </div>
+          <Link
+            href="/feedback"
+            className="flex items-center gap-3 px-5 py-3 text-sm text-ink hover:bg-kale-50 active:bg-kale-100"
+          >
+            <i className="ti ti-message-circle text-xl text-kale-700 w-6 text-center" />
+            <span className="flex-1">{str.feedback}</span>
+            <i className="ti ti-chevron-right text-kale-300" />
+          </Link>
 
           {!user && (
             <>

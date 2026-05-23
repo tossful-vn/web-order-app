@@ -150,3 +150,18 @@
 .tossful-calc .name-row { position: relative; padding-bottom: 0; }
 .tossful-calc .name-suggest-note { font-size: 9px; color: #0F563D; padding: 4px 18px 0; font-style: italic; opacity: 0.7; }
 .tossful-calc .save-error { background: #FBEAEB; color: #791F1F; padding: 8px 14px; margin: 6px 18px 0; border-radius: 8px; font-size: 11px; }
+
+/* Step 1 starter cards + step navigation */
+.tossful-calc .choose-q { font-size: 13px; color: var(--ink, #1f2a1d); margin-top: 12px; font-weight: 500; }
+.tossful-calc .starter-stack { display: flex; flex-direction: column; gap: 12px; padding: 14px 20px 0; }
+.tossful-calc .starter-card { display: flex; align-items: center; gap: 14px; padding: 18px 16px; border: 0.5px solid rgba(0,0,0,0.08); border-radius: 14px; background: #fff; font-family: inherit; cursor: pointer; text-align: left; transition: all 0.15s; width: 100%; }
+.tossful-calc .starter-card:hover { border-color: #0F563D; box-shadow: 0 4px 14px rgba(15,86,61,0.12); transform: translateY(-1px); }
+.tossful-calc .starter-card .starter-ico { width: 44px; height: 44px; border-radius: 50%; background: #FFE9C2; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #0F563D; }
+.tossful-calc .starter-card .starter-ico i { font-size: 22px; }
+.tossful-calc .starter-card .starter-body { flex: 1; }
+.tossful-calc .starter-card .starter-title { font-family: 'Fraunces', Georgia, serif; font-style: italic; font-size: 17px; color: #0F563D; line-height: 1.1; letter-spacing: -0.2px; margin-bottom: 4px; }
+.tossful-calc .starter-card .starter-desc { font-size: 11px; color: #5F5E5A; line-height: 1.4; }
+.tossful-calc .starter-card .starter-arrow { color: #ccc; font-size: 20px; flex-shrink: 0; }
+.tossful-calc .back-link { display: inline-flex; align-items: center; gap: 6px; background: transparent; border: 0; padding: 12px 20px 0; font-family: inherit; font-size: 12px; color: #0F563D; cursor: pointer; }
+.tossful-calc .back-link:hover { text-decoration: underline; }
+.tossful-calc .back-link i { font-size: 16px; }
