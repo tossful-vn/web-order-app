@@ -5,15 +5,23 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useLang } from "@/lib/lang";
 import { BYW_STR } from "./i18n";
+import MacroPanel from "@/lib/components/MacroPanel";
 import { addWeekItem, removeWeekItem } from "@/lib/weeks/actions";
 
-// Daily RDI baselines (same as calculator)
-const RDI = { cal: 2000, protein: 50, fat: 70, carbs: 260, fibre: 28 };
-const RING_C = 188.5;
-
-type Macros = { kcal: number | null; protein_g: number | null; fat_g: number | null; carbs_g: number | null; fibre_g: number | null };
+type Macros = {
+  kcal: number | null;
+  protein_g: number | null;
+  fat_g: number | null;
+  carbs_g: number | null;
+  fibre_g: number | null;
+};
 type BowlMin = { id: string; name: string } & Macros;
-type AddonMin = { id: string; kind: "drink" | "food"; name_en: string; name_vn: string | null } & Macros;
+type AddonMin = {
+  id: string;
+  kind: "drink" | "food";
+  name_en: string;
+  name_vn: string | null;
+} & Macros;
 
 type WeekItemRow = {
   id: string;
@@ -41,7 +49,7 @@ type Props = {
   addons: AddonMin[];
 };
 
-function macrosOf(item: WeekItemRow): { cal: number; protein: number; fat: number; carbs: number; fibre: number } {
+function macrosOf(item: WeekItemRow) {
   const num = (v: number | null | undefined) => Number(v ?? 0);
   if (item.item_kind === "bowl" && item.bowl) {
     return { cal: num(item.bowl.kcal), protein: num(item.bowl.protein_g), fat: num(item.bowl.fat_g), carbs: num(item.bowl.carbs_g), fibre: num(item.bowl.fibre_g) };
@@ -69,43 +77,6 @@ function iconOf(kind: WeekItemRow["item_kind"]): string {
   return "?";
 }
 
-function pctDash(value: number, target: number): number {
-  if (target <= 0) return 0;
-  return Math.min(value / target, 1) * RING_C;
-}
-
-function Rings({ totals, large, labelMap }: {
-  totals: { cal: number; protein: number; fat: number; carbs: number; fibre: number };
-  large: boolean;
-  labelMap: { cal: string; protein: string; fat: string; carbs: string; fiber: string };
-}) {
-  const data: Array<{ key: "cal" | "protein" | "fat" | "carbs" | "fiber"; val: string; pct: number; lbl: string }> = [
-    { key: "cal", val: Math.round(totals.cal).toLocaleString(), pct: pctDash(totals.cal, RDI.cal), lbl: labelMap.cal },
-    { key: "protein", val: `${totals.protein.toFixed(0)}g`, pct: pctDash(totals.protein, RDI.protein), lbl: labelMap.protein },
-    { key: "fat", val: `${totals.fat.toFixed(0)}g`, pct: pctDash(totals.fat, RDI.fat), lbl: labelMap.fat },
-    { key: "carbs", val: `${totals.carbs.toFixed(0)}g`, pct: pctDash(totals.carbs, RDI.carbs), lbl: labelMap.carbs },
-    { key: "fiber", val: `${totals.fibre.toFixed(0)}g`, pct: pctDash(totals.fibre, RDI.fibre), lbl: labelMap.fiber },
-  ];
-  return (
-    <div className="igrid">
-      {data.map((d) => (
-        <div key={d.key} className={large ? "ring-item" : "dring"} data-m={d.key}>
-          <div className={large ? "ring-wrap" : "dring-wrap"}>
-            <svg viewBox="0 0 72 72">
-              <circle className="bg" cx={36} cy={36} r={30} />
-              <circle className="fg" cx={36} cy={36} r={30} style={{ strokeDasharray: `${d.pct} ${RING_C}` }} />
-            </svg>
-            <div className={large ? "ring-center" : "dring-center"}>
-              <div className="val">{d.val}</div>
-              <div className="lbl">{d.lbl}</div>
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export default function Planner({ weekId: _weekId, items, savedBowls, addons }: Props) {
   const [lang] = useLang();
   const str = BYW_STR[lang];
@@ -115,7 +86,6 @@ export default function Planner({ weekId: _weekId, items, savedBowls, addons }: 
   const [pickerErr, setPickerErr] = useState<string | null>(null);
   const [busy, startTransition] = useTransition();
 
-  // Custom form state (per-open of picker)
   const [cName, setCName] = useState("");
   const [cKcal, setCKcal] = useState("");
   const [cProtein, setCProtein] = useState("");
@@ -143,19 +113,6 @@ export default function Planner({ weekId: _weekId, items, savedBowls, addons }: 
     });
   }, [itemsByDay]);
 
-  const weekTotals = useMemo(() => {
-    const t = { cal: 0, protein: 0, fat: 0, carbs: 0, fibre: 0 };
-    for (const day of dayTotals) {
-      t.cal += day.cal; t.protein += day.protein; t.fat += day.fat; t.carbs += day.carbs; t.fibre += day.fibre;
-    }
-    return t;
-  }, [dayTotals]);
-
-  // Week-aggregate vs 7x daily RDI: scale targets by 7
-  const weekRdiScaled = { cal: weekTotals.cal / 7, protein: weekTotals.protein / 7, fat: weekTotals.fat / 7, carbs: weekTotals.carbs / 7, fibre: weekTotals.fibre / 7 };
-  // Show actual week numbers in center but ring fill = % of 7x daily RDI
-  const weekDisplayTotals = weekTotals;
-
   function closePicker() {
     setOpenDay(null);
     setPickerErr(null);
@@ -167,10 +124,7 @@ export default function Planner({ weekId: _weekId, items, savedBowls, addons }: 
     setPickerErr(null);
     startTransition(async () => {
       const res = await addWeekItem(args);
-      if ("error" in res) {
-        setPickerErr(res.error);
-        return;
-      }
+      if ("error" in res) { setPickerErr(res.error); return; }
       closePicker();
       router.refresh();
     });
@@ -192,7 +146,7 @@ export default function Planner({ weekId: _weekId, items, savedBowls, addons }: 
     });
   }
 
-  const labelMap = { cal: str.macro_cal, protein: str.macro_protein, fat: str.macro_fat, carbs: str.macro_carbs, fiber: str.macro_fiber };
+  const macroLabels = { cal: str.macro_cal, protein: str.macro_protein, fat: str.macro_fat, carbs: str.macro_carbs, fiber: str.macro_fiber };
 
   return (
     <div className="byw-page">
@@ -200,17 +154,7 @@ export default function Planner({ weekId: _weekId, items, savedBowls, addons }: 
         <h1 className="byw-hero-h1">{str.page_title}</h1>
         <p className="byw-hero-p">{str.page_sub}</p>
 
-        {/* Week hero */}
-        <div className="week-hero" style={{ ["--week-label" as never]: `"${str.week_label}"` }}>
-          <Rings totals={{ ...weekDisplayTotals, ...{} }} large={true} labelMap={labelMap}
-            // Override pct: ring fill vs 7-day target = totals / (7 * RDI)
-            // We pass a transformed totals so the dash formula matches: pctDash uses totals/RDI*1.
-            // To represent vs 7x RDI, divide by 7 first.
-          />
-        </div>
-
-        {/* 7 day cards */}
-        {[0,1,2,3,4,5,6].map((d) => {
+        {[0, 1, 2, 3, 4, 5, 6].map((d) => {
           const dayItems = itemsByDay[d];
           const isEmpty = dayItems.length === 0;
           const totals = dayTotals[d];
@@ -221,13 +165,16 @@ export default function Planner({ weekId: _weekId, items, savedBowls, addons }: 
                 {isEmpty ? (
                   <span className="empty-tag">{str.empty_day}</span>
                 ) : (
-                  <span className="cal">{str.item_count(dayItems.length)} &middot; {Math.round(totals.cal)} cal</span>
+                  <span className="cal">{str.item_count(dayItems.length)}</span>
                 )}
               </div>
 
-              <div className="day-rings">
-                <Rings totals={totals} large={false} labelMap={labelMap} />
-              </div>
+              <MacroPanel
+                totals={totals}
+                label={str.week_label}
+                macroLabels={macroLabels}
+                dim={isEmpty}
+              />
 
               {!isEmpty && (
                 <div className="day-items">
@@ -256,7 +203,6 @@ export default function Planner({ weekId: _weekId, items, savedBowls, addons }: 
         })}
       </div>
 
-      {/* Picker bottom sheet */}
       {openDay !== null && (
         <div className="picker-backdrop" onClick={closePicker}>
           <div className="picker" onClick={(e) => e.stopPropagation()}>

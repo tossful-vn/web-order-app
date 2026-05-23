@@ -1,0 +1,17 @@
+.macro-panel { background: #0F563D; color: #F4F1E6; border-radius: 14px; padding: 14px 6px 10px; position: relative; box-shadow: 0 4px 14px rgba(15,86,61,0.25); }
+.macro-panel::before { content: var(--macro-label, '""'); position: absolute; top: -8px; left: 14px; background: #F68C02; color: #fff; font-size: 8px; padding: 2px 9px; border-radius: 999px; letter-spacing: 0.4px; white-space: nowrap; }
+.macro-panel .igrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; }
+.macro-panel .ring-item { text-align: center; }
+.macro-panel .ring-wrap { position: relative; width: 50px; height: 50px; margin: 0 auto; }
+.macro-panel svg { width: 50px; height: 50px; display: block; transform: rotate(-90deg); }
+.macro-panel svg .bg { fill: none; stroke: rgba(244,241,230,0.18); stroke-width: 6; }
+.macro-panel svg .fg { fill: none; stroke-width: 6; stroke-linecap: round; transition: stroke-dasharray 0.4s ease; }
+.macro-panel .ring-item[data-m="cal"] .fg { stroke: #F4F1E6; }
+.macro-panel .ring-item[data-m="protein"] .fg { stroke: #F8E3F3; }
+.macro-panel .ring-item[data-m="fat"] .fg { stroke: #F68C02; }
+.macro-panel .ring-item[data-m="carbs"] .fg { stroke: #FFE9C2; }
+.macro-panel .ring-item[data-m="fiber"] .fg { stroke: #C0DD97; }
+.macro-panel .ring-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.macro-panel .ring-center .val { font-family: 'Fraunces', Georgia, serif; font-style: italic; font-size: 11px; line-height: 1; }
+.macro-panel .ring-center .lbl { font-size: 6px; opacity: 0.75; text-transform: uppercase; letter-spacing: 0.4px; margin-top: 2px; }
+.macro-panel.dim { opacity: 0.55; }

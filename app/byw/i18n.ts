@@ -3,7 +3,7 @@ export type Lang = "en" | "vi";
 
 const VI_page_title = "Tuần của tôi";
 const VI_page_sub = "Lên kế hoạch mỗi ngày. Mỗi ngày hiển thị dinh dưỡng so với mục tiêu hàng ngày.";
-const VI_week_label = "Tuần này · % mục tiêu 7 ngày";
+const VI_week_label = "% mục tiêu hôm nay";
 const VI_add_item = "Thêm";
 const VI_add_first = "Thêm bowl, đồ uống hoặc món ăn";
 const VI_empty_day = "Chưa có gì";
@@ -36,7 +36,7 @@ export const BYW_STR = {
   en: {
     page_title: "My week",
     page_sub: "Plan each day. Add bowls and drinks. Each day shows nutrition vs. recommended daily intake.",
-    week_label: "Week so far · % of 7-day target",
+    week_label: "% of daily target",
     add_item: "Add",
     add_first: "Add bowl, drink or food",
     empty_day: "Nothing planned yet",

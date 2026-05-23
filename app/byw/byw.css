@@ -4,22 +4,6 @@
 .byw-hero-h1 { font-family: 'Fraunces', serif; font-style: italic; font-weight: 300; font-size: 26px; line-height: 1.05; color: #0F563D; margin: 18px 20px 4px; letter-spacing: -0.5px; }
 .byw-hero-p { font-size: 12px; color: #5F5E5A; margin: 0 20px 12px; line-height: 1.5; }
 
-.week-hero { margin: 0 16px 16px; background: #0F563D; color: #F4F1E6; border-radius: 14px; padding: 14px 8px 10px; position: relative; box-shadow: 0 4px 14px rgba(15,86,61,0.25); }
-.week-hero::before { content: var(--week-label, '""'); position: absolute; top: -8px; left: 14px; background: #F68C02; color: #fff; font-size: 8px; padding: 2px 9px; border-radius: 999px; letter-spacing: 0.4px; white-space: nowrap; }
-.week-hero .igrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; }
-.week-hero .ring-item { text-align: center; }
-.week-hero .ring-wrap { position: relative; width: 54px; height: 54px; margin: 0 auto; }
-.week-hero svg { width: 54px; height: 54px; transform: rotate(-90deg); }
-.week-hero svg .bg { fill: none; stroke: rgba(244,241,230,0.18); stroke-width: 6; }
-.week-hero svg .fg { fill: none; stroke-width: 6; stroke-linecap: round; }
-.week-hero .ring-item[data-m="cal"] .fg { stroke: #F4F1E6; }
-.week-hero .ring-item[data-m="protein"] .fg { stroke: #F8E3F3; }
-.week-hero .ring-item[data-m="fat"] .fg { stroke: #F68C02; }
-.week-hero .ring-item[data-m="carbs"] .fg { stroke: #FFE9C2; }
-.week-hero .ring-item[data-m="fiber"] .fg { stroke: #C0DD97; }
-.week-hero .ring-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-.week-hero .val { font-family: 'Fraunces', serif; font-style: italic; font-size: 12px; line-height: 1; }
-.week-hero .lbl { font-size: 6px; opacity: 0.75; text-transform: uppercase; letter-spacing: 0.4px; margin-top: 2px; }
 
 .day-card { background: #fff; border: 0.5px solid rgba(0,0,0,0.08); border-radius: 12px; margin: 0 16px 10px; padding: 10px 12px; }
 .day-card.empty { border-style: dashed; }
@@ -28,21 +12,6 @@
 .day-head .cal { font-size: 10px; color: #5F5E5A; font-family: 'Fraunces', serif; font-style: italic; }
 .day-head .empty-tag { font-size: 10px; color: #aaa; font-style: italic; }
 
-.day-rings { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; padding: 6px 0 8px; border-bottom: 0.5px dashed rgba(0,0,0,0.08); margin-bottom: 8px; }
-.dring { text-align: center; }
-.dring-wrap { position: relative; width: 38px; height: 38px; margin: 0 auto; }
-.dring svg { width: 38px; height: 38px; display: block; transform: rotate(-90deg); }
-.dring svg .bg { fill: none; stroke: rgba(15,86,61,0.10); stroke-width: 6; }
-.dring svg .fg { fill: none; stroke-width: 6; stroke-linecap: round; transition: stroke-dasharray 0.4s ease; }
-.dring[data-m="cal"] .fg { stroke: #0F563D; }
-.dring[data-m="protein"] .fg { stroke: #7D291A; }
-.dring[data-m="fat"] .fg { stroke: #F68C02; }
-.dring[data-m="carbs"] .fg { stroke: #C99A20; }
-.dring[data-m="fiber"] .fg { stroke: #6BA547; }
-.dring-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-.dring .val { font-family: 'Fraunces', serif; font-style: italic; font-size: 10px; line-height: 1; color: #0F563D; }
-.dring .lbl { font-size: 5px; color: #5F5E5A; text-transform: uppercase; letter-spacing: 0.3px; margin-top: 2px; }
-.day-card.empty .day-rings { opacity: 0.45; }
 
 .day-items { display: flex; flex-direction: column; gap: 4px; }
 .day-item { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; background: rgba(15,86,61,0.04); font-size: 11px; }
