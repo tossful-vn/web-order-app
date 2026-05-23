@@ -1,0 +1,148 @@
+/* Tossful nutrition calculator — ported from workshop/nutrition-calculator/index.html
+   Scoped to .tossful-calc to avoid leaking into the rest of the app. */
+
+.tossful-calc * { box-sizing: border-box; }
+.tossful-calc { background: #F4F1E6; font-family: 'Questrial', system-ui, sans-serif; color: #1a1a1a; min-height: 100vh; }
+.tossful-calc .app { max-width: 480px; margin: 0 auto; padding-bottom: 24px; }
+.tossful-calc .hdr { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px 10px; }
+.tossful-calc .hdr img { height: 28px; width: auto; }
+.tossful-calc .hdr .info { flex: 1; text-align: center; }
+.tossful-calc .hdr .info .t { font-family: 'Fraunces', Georgia, serif; font-style: italic; font-size: 13px; color: #0F563D; line-height: 1.1; }
+.tossful-calc .hdr .info .s { font-size: 10px; color: #888; letter-spacing: 0.4px; text-transform: uppercase; }
+.tossful-calc .lang-toggle { display: flex; background: rgba(15,86,61,0.08); border-radius: 999px; padding: 2px; }
+.tossful-calc .lang-toggle button { background: transparent; border: 0; padding: 4px 9px; font-size: 11px; color: #0F563D; border-radius: 999px; cursor: pointer; font-family: inherit; font-weight: 500; }
+.tossful-calc .lang-toggle button.on { background: #0F563D; color: #F4F1E6; }
+.tossful-calc .tabs { display: flex; gap: 20px; padding: 0 20px; border-bottom: 0.5px solid rgba(0,0,0,0.1); }
+.tossful-calc .tabs span { padding: 8px 0; font-size: 13px; color: #5F5E5A; border-bottom: 2px solid transparent; cursor: pointer; }
+.tossful-calc .tabs span.on { color: #0F563D; border-bottom-color: #0F563D; font-weight: 500; }
+.tossful-calc .sigs { padding: 14px 20px 0; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; max-width: 720px; margin: 0 auto; }
+.tossful-calc .sig-card { background: #fff; border-radius: 14px; padding: 0; border: 0.5px solid rgba(0,0,0,0.08); display: flex; flex-direction: column; overflow: hidden; }
+.tossful-calc .sig-card .photo { width: 100%; aspect-ratio: 1; background: #F4F1E6; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+.tossful-calc .sig-card .photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tossful-calc .sig-card .photo .ph { font-family: 'Fraunces', Georgia, serif; font-style: italic; font-size: 22px; color: #0F563D; padding: 12px; text-align: center; }
+.tossful-calc .sig-card .body { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.tossful-calc .sig-card h4 { font-family: 'Fraunces', Georgia, serif; font-style: italic; font-weight: 300; font-size: 17px; color: #0F563D; margin: 0; line-height: 1.1; letter-spacing: -0.2px; }
+.tossful-calc .sig-card .tag { font-size: 10px; color: #888; font-style: italic; }
+.tossful-calc .sig-card .macros { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; font-size: 11px; color: #5F5E5A; padding: 8px 0; border-top: 0.5px solid rgba(0,0,0,0.06); border-bottom: 0.5px solid rgba(0,0,0,0.06); }
+.tossful-calc .sig-card .macros .m { display: flex; flex-direction: row; align-items: baseline; gap: 6px; }
+.tossful-calc .sig-card .macros .v { font-family: 'Fraunces', Georgia, serif; font-style: italic; color: #0F563D; font-size: 15px; line-height: 1; }
+.tossful-calc .sig-card .macros .l { font-size: 9px; text-transform: uppercase; letter-spacing: 0.3px; opacity: 0.7; }
+.tossful-calc .sig-card .ings { font-size: 11px; color: #5F5E5A; line-height: 1.3; }
+.tossful-calc .sig-card .use-btn { background: #0F563D; color: #F4F1E6; border-radius: 999px; padding: 8px; font-size: 11px; font-family: inherit; border: 0; cursor: pointer; margin-top: auto; }
+.tossful-calc .hidden { display: none !important; }
+
+.tossful-calc .hero { padding: 14px 20px 0; }
+.tossful-calc .hero h1 { font-family: 'Fraunces', Georgia, serif; font-style: italic; font-weight: 300; font-size: 24px; line-height: 1.05; color: #0F563D; margin: 0 0 4px; letter-spacing: -0.6px; }
+.tossful-calc .hero p { font-size: 12px; color: #5F5E5A; margin: 0; }
+.tossful-calc .infographic { margin: 6px 12px 6px; background: #0F563D; color: #F4F1E6; border-radius: 16px; padding: 14px 10px 10px; position: sticky; top: 8px; z-index: 20; box-shadow: 0 4px 14px rgba(15,86,61,0.25); }
+.tossful-calc .infographic::before { content: var(--bowl-label, 'Your bowl'); position: absolute; top: -8px; left: 14px; background: #F68C02; color: #fff; font-size: 8px; padding: 2px 9px; border-radius: 999px; letter-spacing: 0.4px; white-space: nowrap; }
+.tossful-calc .igrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; }
+.tossful-calc .ring-item { text-align: center; position: relative; }
+.tossful-calc .ring-wrap { position: relative; width: 60px; height: 60px; margin: 0 auto; }
+.tossful-calc .ring { width: 60px; height: 60px; display: block; transform: rotate(-90deg); }
+.tossful-calc .ring .bg { fill: none; stroke: rgba(244,241,230,0.18); stroke-width: 6; }
+.tossful-calc .ring .fg { fill: none; stroke-width: 6; stroke-linecap: round; stroke-dasharray: 0 188.5; transition: stroke-dasharray 0.4s ease; }
+.tossful-calc .ring-item[data-macro="cal"] .ring .fg { stroke: #F4F1E6; }
+.tossful-calc .ring-item[data-macro="protein"] .ring .fg { stroke: #F8E3F3; }
+.tossful-calc .ring-item[data-macro="fat"] .ring .fg { stroke: #F68C02; }
+.tossful-calc .ring-item[data-macro="carbs"] .ring .fg { stroke: #FFE9C2; }
+.tossful-calc .ring-item[data-macro="fiber"] .ring .fg { stroke: #C0DD97; }
+.tossful-calc .ring-center { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
+.tossful-calc .ring-center .val { font-family: 'Fraunces', Georgia, serif; font-style: italic; font-size: 13px; line-height: 1; }
+.tossful-calc .ring-center .lbl { font-size: 7px; opacity: 0.75; text-transform: uppercase; letter-spacing: 0.4px; margin-top: 2px; line-height: 1; }
+.tossful-calc .section { padding: 12px 20px 0; }
+.tossful-calc .section .h { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px; gap: 8px; }
+.tossful-calc .section h3 { font-family: 'Fraunces', Georgia, serif; font-style: italic; font-weight: 300; font-size: 16px; color: #0F563D; margin: 0; }
+.tossful-calc .section .meta { display: flex; align-items: baseline; gap: 8px; }
+.tossful-calc .section .count { font-size: 11px; color: #0F563D; font-weight: 500; background: #FFE9C2; padding: 1px 8px; border-radius: 999px; }
+.tossful-calc .section .count.zero { background: transparent; color: #888; font-weight: 400; padding-left: 0; padding-right: 0; }
+.tossful-calc .section .hint { font-size: 10px; color: #888; }
+.tossful-calc .summary { margin: 18px 20px 0; padding: 14px; background: #fff; border-radius: 14px; border: 0.5px solid rgba(0,0,0,0.08); }
+.tossful-calc .summary h3 { font-family: 'Fraunces', Georgia, serif; font-style: italic; font-weight: 300; font-size: 16px; color: #0F563D; margin: 0 0 10px; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.tossful-calc .summary .total-g { font-size: 11px; color: #5F5E5A; font-weight: 400; font-style: normal; font-family: 'Questrial', sans-serif; }
+.tossful-calc .summary .empty { font-size: 12px; color: #888; padding: 10px 0; text-align: center; }
+.tossful-calc .summary-list { display: flex; flex-direction: column; gap: 6px; }
+.tossful-calc .summary-item { display: flex; align-items: center; gap: 10px; padding: 4px 0; }
+.tossful-calc .summary-item .thumb { width: 36px; height: 36px; border-radius: 8px; overflow: hidden; flex-shrink: 0; background: #F4F1E6; display: flex; align-items: center; justify-content: center; }
+.tossful-calc .summary-item .thumb img { width: 100%; height: 100%; object-fit: cover; }
+.tossful-calc .summary-item .thumb i { font-size: 18px; color: #0F563D; }
+.tossful-calc .summary-item .name { flex: 1; font-size: 13px; color: #1a1a1a; }
+.tossful-calc .summary-item .gram { font-size: 11px; color: #5F5E5A; font-family: 'Fraunces', Georgia, serif; font-style: italic; }
+.tossful-calc .summary-item .remove { width: 22px; height: 22px; border-radius: 50%; background: transparent; color: #999; display: flex; align-items: center; justify-content: center; cursor: pointer; border: none; padding: 0; }
+.tossful-calc .summary-item .remove:hover { background: #F8E3F3; color: #7D291A; }
+.tossful-calc .chips { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+@media (min-width: 480px) { .tossful-calc .chips { grid-template-columns: repeat(4, 1fr); } }
+.tossful-calc .chip { background: #fff; border: 2px solid transparent; border-radius: 14px; padding: 8px 6px 8px; text-align: center; cursor: pointer; user-select: none; transition: all 0.15s; display: flex; flex-direction: column; align-items: center; position: relative; }
+.tossful-calc .chip-qty { display: none; position: absolute; top: 6px; right: 6px; background: #0F563D; color: #F4F1E6; border-radius: 999px; padding: 2px; align-items: center; gap: 0; font-size: 11px; line-height: 1; box-shadow: 0 2px 6px rgba(0,0,0,0.15); }
+.tossful-calc .chip.on .chip-qty, .tossful-calc .chip.on-kale .chip-qty { display: flex; }
+.tossful-calc .chip-qty button { width: 20px; height: 20px; border-radius: 50%; background: transparent; border: 0; color: inherit; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; padding: 0; font-family: inherit; }
+.tossful-calc .chip-qty button:hover { background: rgba(244,241,230,0.2); }
+.tossful-calc .chip-qty .qty-num { min-width: 18px; text-align: center; font-family: 'Fraunces', Georgia, serif; font-style: italic; font-size: 13px; padding: 0 2px; }
+.tossful-calc .qty-badge { background: #FFE9C2; color: #7D291A; font-family: 'Fraunces', Georgia, serif; font-style: italic; font-size: 11px; padding: 1px 6px; border-radius: 999px; margin-left: 4px; }
+.tossful-calc .chip:hover { border-color: rgba(15,86,61,0.4); }
+.tossful-calc .chip.on { background: #F8E3F3; border-color: #7D291A; }
+.tossful-calc .chip.on-kale { background: #FFE9C2; border-color: #0F563D; }
+.tossful-calc .chip-img { width: 100%; aspect-ratio: 1; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 6px; overflow: hidden; background: #fff; }
+.tossful-calc .chip-img img { width: 100%; height: 100%; object-fit: cover; }
+.tossful-calc .chip-img i { font-size: 28px; color: #F4F1E6; }
+.tossful-calc .chip-img .initial { font-family: 'Fraunces', Georgia, serif; font-style: italic; font-size: 26px; color: #F4F1E6; line-height: 1; }
+.tossful-calc .chip-name { font-size: 11px; color: #1a1a1a; line-height: 1.2; min-height: 26px; display: flex; align-items: center; justify-content: center; }
+.tossful-calc .chip.on .chip-name { color: #7D291A; font-weight: 500; }
+.tossful-calc .chip.on-kale .chip-name { color: #0F563D; font-weight: 500; }
+.tossful-calc .name-row { padding: 14px 20px 0; }
+.tossful-calc .name-input { width: 100%; padding: 10px 14px; border-radius: 999px; border: 0.5px solid rgba(0,0,0,0.15); font-family: inherit; font-size: 13px; background: #fff; color: #1a1a1a; box-sizing: border-box; }
+.tossful-calc .name-input:focus { outline: none; border-color: #0F563D; }
+.tossful-calc .name-input::placeholder { color: #aaa; }
+.tossful-calc .foot { padding: 10px 20px 4px; display: flex; gap: 10px; }
+.tossful-calc .btn { flex: 1; padding: 10px; border-radius: 999px; font-size: 12px; text-align: center; font-family: inherit; border: 0; cursor: pointer; }
+.tossful-calc .btn.ghost { background: #fff; color: #1a1a1a; border: 0.5px solid rgba(0,0,0,0.15); }
+.tossful-calc .btn.kale { background: #0F563D; color: #F4F1E6; }
+.tossful-calc .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.tossful-calc .foot-note { text-align: center; font-size: 10px; color: #888; padding: 6px 20px 16px; }
+.tossful-calc .loader { padding: 60px 20px; text-align: center; color: #5F5E5A; font-size: 12px; }
+.tossful-calc .err { background: #FBEAEB; color: #791F1F; padding: 12px; margin: 12px 20px; border-radius: 8px; font-size: 12px; }
+
+/* Feedback tab */
+.tossful-calc .fb-wrap { padding: 16px 20px 24px; }
+.tossful-calc .fb-head { margin: 4px 0 14px; }
+.tossful-calc .fb-head h2 { font-family: 'Fraunces', Georgia, serif; font-style: italic; font-weight: 300; font-size: 22px; color: #0F563D; margin: 0 0 6px; line-height: 1.1; letter-spacing: -0.4px; }
+.tossful-calc .fb-head p { font-size: 12px; color: #5F5E5A; margin: 0; line-height: 1.4; }
+.tossful-calc .fb-q { margin-bottom: 16px; }
+.tossful-calc .fb-q .fb-label { display: block; font-size: 13px; color: #1a1a1a; margin-bottom: 8px; font-weight: 500; }
+.tossful-calc .fb-scale { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.tossful-calc .fb-scale button { background: #fff; border: 0.5px solid rgba(0,0,0,0.15); border-radius: 12px; padding: 12px 0; font-family: 'Fraunces', Georgia, serif; font-style: italic; font-size: 18px; color: #5F5E5A; cursor: pointer; transition: all 0.15s; }
+.tossful-calc .fb-scale button:hover { border-color: rgba(15,86,61,0.4); }
+.tossful-calc .fb-scale button.on { background: #0F563D; color: #F4F1E6; border-color: #0F563D; }
+.tossful-calc .fb-scale-labels { display: flex; justify-content: space-between; font-size: 10px; color: #888; margin-top: 4px; padding: 0 4px; }
+.tossful-calc .fb-choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.tossful-calc .fb-choices button { background: #fff; border: 0.5px solid rgba(0,0,0,0.15); border-radius: 12px; padding: 11px 6px; font-family: inherit; font-size: 13px; color: #1a1a1a; cursor: pointer; transition: all 0.15s; }
+.tossful-calc .fb-choices button:hover { border-color: rgba(15,86,61,0.4); }
+.tossful-calc .fb-choices button.on { background: #0F563D; color: #F4F1E6; border-color: #0F563D; }
+.tossful-calc .fb-multi { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.tossful-calc .fb-multi button { background: #fff; border: 0.5px solid rgba(0,0,0,0.15); border-radius: 12px; padding: 10px 8px; font-family: inherit; font-size: 12px; color: #1a1a1a; cursor: pointer; transition: all 0.15s; text-align: left; display: flex; align-items: center; gap: 6px; }
+.tossful-calc .fb-multi button:hover { border-color: rgba(15,86,61,0.4); }
+.tossful-calc .fb-multi button.on { background: #FFE9C2; color: #7D291A; border-color: #F68C02; }
+.tossful-calc .fb-multi button::before { content: ''; display: inline-block; width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid rgba(0,0,0,0.25); background: transparent; flex-shrink: 0; transition: all 0.15s; }
+.tossful-calc .fb-multi button.on::before { background: #F68C02; border-color: #F68C02; content: ''; color: #fff; font-size: 11px; text-align: center; line-height: 11px; }
+.tossful-calc .fb-textarea, .tossful-calc .fb-input { width: 100%; box-sizing: border-box; padding: 10px 14px; border-radius: 12px; border: 0.5px solid rgba(0,0,0,0.15); font-family: inherit; font-size: 13px; background: #fff; color: #1a1a1a; resize: vertical; }
+.tossful-calc .fb-textarea { min-height: 64px; }
+.tossful-calc .fb-textarea:focus, .tossful-calc .fb-input:focus { outline: none; border-color: #0F563D; }
+.tossful-calc .fb-textarea::placeholder, .tossful-calc .fb-input::placeholder { color: #aaa; }
+.tossful-calc .fb-context { background: rgba(15,86,61,0.06); border-radius: 12px; padding: 10px 12px; margin: 8px 0 16px; font-size: 11px; color: #5F5E5A; line-height: 1.5; }
+.tossful-calc .fb-context .fb-context-label { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.4px; color: #0F563D; margin-bottom: 4px; font-weight: 500; }
+.tossful-calc .fb-context-row { display: flex; gap: 6px; }
+.tossful-calc .fb-context-row .k { color: #888; min-width: 90px; }
+.tossful-calc .fb-context-row .v { color: #1a1a1a; flex: 1; }
+.tossful-calc .fb-submit-row { padding-top: 6px; }
+.tossful-calc .fb-submit { width: 100%; padding: 14px; border-radius: 999px; background: #0F563D; color: #F4F1E6; border: 0; font-family: inherit; font-size: 14px; cursor: pointer; transition: opacity 0.15s; }
+.tossful-calc .fb-submit:hover { opacity: 0.92; }
+.tossful-calc .fb-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+.tossful-calc .fb-error { background: #FBEAEB; color: #791F1F; padding: 10px 12px; margin-top: 10px; border-radius: 10px; font-size: 12px; }
+.tossful-calc .fb-thanks { padding: 40px 20px; text-align: center; }
+.tossful-calc .fb-thanks .ti { font-size: 56px; color: #0F563D; display: block; margin-bottom: 12px; }
+.tossful-calc .fb-thanks h3 { font-family: 'Fraunces', Georgia, serif; font-style: italic; font-weight: 300; font-size: 24px; color: #0F563D; margin: 0 0 8px; }
+.tossful-calc .fb-thanks p { font-size: 13px; color: #5F5E5A; margin: 0 0 18px; line-height: 1.5; }
+.tossful-calc .fb-thanks-again { background: transparent; color: #0F563D; border: 0.5px solid rgba(15,86,61,0.3); padding: 9px 18px; border-radius: 999px; font-family: inherit; font-size: 12px; cursor: pointer; }
+.tossful-calc .fb-thanks-again:hover { background: rgba(15,86,61,0.08); }
+
+.tossful-calc .save-soon { font-size: 9px; color: #888; text-align: center; padding: 4px 20px 0; letter-spacing: 0.3px; }
