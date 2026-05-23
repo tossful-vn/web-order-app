@@ -31,15 +31,13 @@ function stripDiacritics(s: string): string {
 }
 
 export function lookupSignaturePhoto(name: string): string | undefined {
+  // 1. Exact match (handles future per-wrap photos if added to SIG_PHOTO_MAP)
   if (SIG_PHOTO_MAP[name]) return SIG_PHOTO_MAP[name];
   const ascii = stripDiacritics(name);
   if (SIG_PHOTO_MAP[ascii]) return SIG_PHOTO_MAP[ascii];
-  // Wrap variants ("Fennel Fling - Wrap") fall back to the bowl photo
-  const withoutWrap = name.replace(/\s*-\s*Wrap\s*$/i, "").trim();
-  if (withoutWrap && withoutWrap !== name) {
-    if (SIG_PHOTO_MAP[withoutWrap]) return SIG_PHOTO_MAP[withoutWrap];
-    const asciiNoWrap = stripDiacritics(withoutWrap);
-    if (SIG_PHOTO_MAP[asciiNoWrap]) return SIG_PHOTO_MAP[asciiNoWrap];
+  // 2. Wrap variants ("<X> - Wrap") -> shared wrap flatlay
+  if (/\s*-\s*Wrap\s*$/i.test(name)) {
+    return "signature_wrap.png";
   }
   return undefined;
 }
