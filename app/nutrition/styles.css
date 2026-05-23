@@ -146,3 +146,7 @@
 .tossful-calc .fb-thanks-again:hover { background: rgba(15,86,61,0.08); }
 
 .tossful-calc .save-soon { font-size: 9px; color: #888; text-align: center; padding: 4px 20px 0; letter-spacing: 0.3px; }
+.tossful-calc .hero .tagline { font-size: 11px; color: #999; font-style: italic; margin-top: 4px; letter-spacing: 0.3px; }
+.tossful-calc .name-row { position: relative; padding-bottom: 0; }
+.tossful-calc .name-suggest-note { font-size: 9px; color: #0F563D; padding: 4px 18px 0; font-style: italic; opacity: 0.7; }
+.tossful-calc .save-error { background: #FBEAEB; color: #791F1F; padding: 8px 14px; margin: 6px 18px 0; border-radius: 8px; font-size: 11px; }

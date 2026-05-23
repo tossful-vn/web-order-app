@@ -14,6 +14,9 @@ export type StringTable = {
   your_bowl: string; empty_summary: string;
   reset: string; save_bowl: string;
   microcopy: string; save_soon: string;
+  bowl_name_placeholder: string;
+  bowl_name_hint: string;
+  saving: string;
   start_from_bowl: string; pick_any: string;
   cat_Base: string; cat_Topping: string; cat_Premium: string; cat_Dressing: string; cat_Free: string;
   save_header_named: string; save_header_anon: string;
@@ -53,6 +56,9 @@ const EN: StringTable = {
   reset: "Reset", save_bowl: "Save bowl",
   microcopy: "All values per serving",
   save_soon: "Save coming soon",
+  bowl_name_placeholder: "Bowl name",
+  bowl_name_hint: "Auto-named from your ingredients — tap to edit",
+  saving: "Saving...",
   start_from_bowl: "Start from this bowl",
   pick_any: "pick any",
   cat_Base: "Base", cat_Topping: "Toppings", cat_Premium: "Premium protein",
@@ -104,7 +110,10 @@ const VI_empty_summary = "Chọn nguyên liệu phía trên để bắt đầu."
 const VI_reset = "Làm lại";
 const VI_save_bowl = "Lưu tô";
 const VI_microcopy = "Dinh dưỡng theo khẩu phần";
-const VI_save_soon = "Sắp có chức năng lưu";
+const VI_save_soon = "Sap co chuc nang luu";
+const VI_bowl_name_placeholder = "Tên bowl";
+const VI_bowl_name_hint = "Tu dat ten tu nguyen lieu — cham de sua";
+const VI_saving = "Dang luu...";
 const VI_start_from_bowl = "Bắt đầu với tô này";
 const VI_pick_any = "chọn bất kỳ";
 const VI_save_header_named = "Đây là tô của {name}:";
@@ -165,6 +174,9 @@ const VI: StringTable = {
   your_bowl: VI_your_bowl, empty_summary: VI_empty_summary,
   reset: VI_reset, save_bowl: VI_save_bowl,
   microcopy: VI_microcopy, save_soon: VI_save_soon,
+  bowl_name_placeholder: VI_bowl_name_placeholder,
+  bowl_name_hint: VI_bowl_name_hint,
+  saving: VI_saving,
   start_from_bowl: VI_start_from_bowl, pick_any: VI_pick_any,
   cat_Base: "Base", cat_Topping: "Topping", cat_Premium: "Premium",
   cat_Dressing: "Dressing", cat_Free: "Free",

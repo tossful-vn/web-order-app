@@ -1,8 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { saveBowl } from "@/lib/bowls/actions";
+import type { BowlComposition } from "@/lib/types/database";
+import { useLang, type Lang } from "@/lib/lang";
 import {
   CATEGORY_BG,
   CATEGORY_ORDER,
@@ -13,7 +16,7 @@ import {
   type Category,
   type MacroKey,
 } from "./photo-maps";
-import { I18N, t, type Lang } from "./i18n";
+import { I18N } from "./i18n";
 
 // ===== Types =====
 type Nutrition = {
@@ -108,42 +111,60 @@ function pickName(item: Item, lang: Lang) {
   return lang === "vi" && item.name_vn ? item.name_vn : item.name_en;
 }
 
+function suggestBowlName(
+  selected: Record<string, number>,
+  items: Item[],
+  lang: Lang,
+): string {
+  const ids = Object.keys(selected);
+  if (ids.length === 0) return "";
+  const picked = ids
+    .map((id) => items.find((i) => i.id === id))
+    .filter((i): i is Item => !!i);
+  const byCat: Record<string, Item[]> = {};
+  for (const i of picked) (byCat[i.category] = byCat[i.category] ?? []).push(i);
+  const base = (byCat["Base"] ?? [])[0];
+  const protein = (byCat["Premium"] ?? [])[0];
+  const dressing = (byCat["Dressing"] ?? [])[0];
+  const topping = (byCat["Topping"] ?? [])[0];
+  const n = (it: Item) => pickName(it, lang);
+  if (lang === "vi") {
+    if (base && protein) return "Tô " + n(protein) + " + " + n(base);
+    if (base && dressing) return "Tô " + n(base) + " sot " + n(dressing);
+    if (base && topping) return "Tô " + n(base) + " " + n(topping);
+    if (base) return "Tô " + n(base);
+    if (protein) return "Tô " + n(protein);
+    return "Tô cua ban";
+  }
+  if (base && protein) return n(base) + " + " + n(protein) + " bowl";
+  if (base && dressing) return n(dressing) + " " + n(base).toLowerCase() + " bowl";
+  if (base && topping) return n(topping) + " " + n(base).toLowerCase() + " bowl";
+  if (base) return n(base) + " bowl";
+  if (protein) return n(protein) + " bowl";
+  return "Your bowl";
+}
+
 // ===== Component =====
 export default function Calculator() {
   const supabase = useMemo(() => createClient(), []);
 
-  const [lang, setLangState] = useState<Lang>("en");
+  const [lang] = useLang();
   const [tab, setTab] = useState<Tab>("byo");
   const [items, setItems] = useState<Item[]>([]);
   const [signatureBowls, setSignatureBowls] = useState<SigBowl[]>([]);
   const [selected, setSelected] = useState<Record<string, number>>({});
   const [lastAppliedSignature, setLastAppliedSignature] = useState<string | null>(null);
-  const [customerName, setCustomerName] = useState<string>("");
+  const [bowlName, setBowlName] = useState<string>("");
+  const [bowlNameCustom, setBowlNameCustom] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const router = useRouter();
 
-  // Restore lang + customer name from localStorage AFTER first render
-  // (avoids hydration mismatch — server can't know localStorage)
-  useEffect(() => {
-    const savedLang = localStorage.getItem("tossful_lang");
-    if (savedLang === "vi" || savedLang === "en") setLangState(savedLang);
-    setCustomerName((localStorage.getItem("tossful_customer_name") ?? "").trim());
-    setHydrated(true);
-  }, []);
-
-  // Persist lang to localStorage + <html lang=""> attr
-  useEffect(() => {
-    if (!hydrated) return;
-    localStorage.setItem("tossful_lang", lang);
-    document.documentElement.lang = lang;
-  }, [lang, hydrated]);
-
-  // Persist customer name to localStorage
-  useEffect(() => {
-    if (!hydrated) return;
-    localStorage.setItem("tossful_customer_name", customerName.trim());
-  }, [customerName, hydrated]);
+  // Restore hydration flag after first render (used by other effects)
+  useEffect(() => { setHydrated(true); }, []);
 
   // Load items + signature bowls from Supabase
   useEffect(() => {
@@ -343,10 +364,6 @@ export default function Calculator() {
     [items, signatureBowls]
   );
 
-  const setLang = useCallback((next: Lang) => {
-    setLangState(next);
-  }, []);
-
   // ===== Render =====
   const str = I18N[lang];
   const items_by_cat = useMemo(() => {
@@ -355,26 +372,86 @@ export default function Calculator() {
     return map;
   }, [items]);
 
+  // Auto-suggest bowl name from current selection (unless user has typed)
+  useEffect(() => {
+    if (bowlNameCustom) return;
+    const suggested = suggestBowlName(selected, items, lang);
+    setBowlName(suggested);
+  }, [selected, items, lang, bowlNameCustom]);
+
+  // Save handler — Bundle 2 M2 wedge
+  const handleSave = useCallback(async () => {
+    setSaveError(null);
+    if (Object.keys(selected).length === 0) {
+      setSaveError(I18N[lang].empty_alert);
+      return;
+    }
+    setSaving(true);
+
+    // Build composition + macros payload
+    const byCategory: Record<string, Item[]> = {};
+    for (const id of Object.keys(selected)) {
+      const item = items.find((i) => i.id === id);
+      if (!item) continue;
+      (byCategory[item.category] = byCategory[item.category] ?? []).push(item);
+    }
+    const toEntry = (item: Item) => ({
+      id: item.id,
+      name: pickName(item, lang),
+      grams: (item.tossful_portion_g ?? 0) * (selected[item.id] ?? 1),
+    });
+    const composition: BowlComposition = {
+      schema_version: 1,
+      base: (byCategory["Base"] ?? [])[0] ? toEntry((byCategory["Base"] ?? [])[0]) : undefined,
+      proteins: (byCategory["Premium"] ?? []).map(toEntry),
+      toppings: (byCategory["Topping"] ?? []).map(toEntry),
+      dressing: (byCategory["Dressing"] ?? [])[0] ? toEntry((byCategory["Dressing"] ?? [])[0]) : undefined,
+      notes: lastAppliedSignature ? "From signature: " + lastAppliedSignature : undefined,
+    };
+    const payload = {
+      name: bowlName.trim() || I18N[lang].your_bowl,
+      composition,
+      kcal: Math.round(totals.cal),
+      protein_g: Number(totals.protein.toFixed(1)),
+      fat_g: Number(totals.fat.toFixed(1)),
+      carbs_g: Number(totals.carbs.toFixed(1)),
+      fibre_g: Number(totals.fiber.toFixed(1)),
+      source_url: "/nutrition",
+    };
+
+    // Check auth state
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (user) {
+      const result = await saveBowl(payload);
+      setSaving(false);
+      if ("error" in result) {
+        setSaveError(result.error);
+        return;
+      }
+      router.push("/account/bowls/" + result.id);
+    } else {
+      // Guest: stash to localStorage + redirect to login -> /account claims it
+      try {
+        window.localStorage.setItem(
+          "tossful:pending_bowl",
+          JSON.stringify(payload),
+        );
+      } catch {
+        // localStorage might be full/disabled — surface error
+        setSaving(false);
+        setSaveError("Could not save locally. Please sign in first.");
+        return;
+      }
+      router.push("/login?next=/account");
+    }
+  }, [selected, items, lang, bowlName, totals, lastAppliedSignature, supabase, router]);
+
   return (
     <div className="tossful-calc">
       <div className="app">
-        {/* Header */}
-        <div className="hdr">
-          <img alt="Tossful" src="/nutrition/tossful-logo.png" />
-          <div className="info">
-            <div className="t">{str.page_title}</div>
-            <div className="s">{str.page_subtitle}</div>
-          </div>
-          <div className="lang-toggle">
-            <button className={lang === "en" ? "on" : ""} onClick={() => setLang("en")}>
-              EN
-            </button>
-            <button className={lang === "vi" ? "on" : ""} onClick={() => setLang("vi")}>
-              VI
-            </button>
-          </div>
-        </div>
-
         {/* Tabs */}
         <div className="tabs">
           <span className={tab === "signature" ? "on" : ""} onClick={() => setTab("signature")}>
@@ -393,6 +470,7 @@ export default function Calculator() {
           <>
             <div className="hero">
               <h1>{str.hero_title}</h1>
+              <div className="tagline">{str.page_title} &middot; {str.page_subtitle}</div>
               <p>{str.hero_subtitle}</p>
             </div>
 
@@ -638,7 +716,7 @@ export default function Calculator() {
           <FeedbackForm
             lang={lang}
             str={str}
-            customerName={customerName}
+            customerName={""}
             ctx={{
               bowl_mode: lastAppliedSignature ? "signature" : "byo",
               signature_bowl: lastAppliedSignature,
@@ -671,27 +749,31 @@ export default function Calculator() {
               <input
                 className="name-input"
                 type="text"
-                maxLength={40}
-                autoComplete="given-name"
-                placeholder={str.name_placeholder}
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
+                maxLength={60}
+                placeholder={str.bowl_name_placeholder}
+                value={bowlName}
+                onChange={(e) => {
+                  setBowlName(e.target.value);
+                  setBowlNameCustom(true);
+                }}
               />
+              {!bowlNameCustom && bowlName && (
+                <div className="name-suggest-note">{str.bowl_name_hint}</div>
+              )}
             </div>
             <div className="foot">
-              <button className="btn ghost" onClick={reset}>
+              <button className="btn ghost" onClick={() => { reset(); setBowlNameCustom(false); }}>
                 {str.reset}
               </button>
               <button
                 className="btn kale"
-                disabled
-                title={str.save_soon}
-                aria-disabled="true"
+                onClick={handleSave}
+                disabled={saving || Object.keys(selected).length === 0}
               >
-                {str.save_bowl}
+                {saving ? str.saving : str.save_bowl}
               </button>
             </div>
-            <div className="save-soon">{str.save_soon}</div>
+            {saveError && <div className="save-error">{saveError}</div>}
             <div className="foot-note">{str.microcopy}</div>
           </>
         )}

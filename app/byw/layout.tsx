@@ -1,12 +1,7 @@
 import { requireUser } from "@/lib/auth/require-user";
 import AppShell from "@/lib/components/AppShell.client";
 
-/**
- * Account layout — requires sign-in. Wraps page in shared AppShell.
- * The old "Saved bowls / Profile / Password" sub-nav is gone; Profile and
- * Password are accessible via the drawer.
- */
-export default async function AccountLayout({
+export default async function BywLayout({
   children,
 }: {
   children: React.ReactNode;
