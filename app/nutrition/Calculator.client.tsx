@@ -146,6 +146,7 @@ export default function Calculator() {
   const [lastAppliedSignature, setLastAppliedSignature] = useState<string | null>(null);
   const [bowlName, setBowlName] = useState<string>("");
   const [bowlNameCustom, setBowlNameCustom] = useState(false);
+  const [signatureSnapshot, setSignatureSnapshot] = useState<{ name: string; ingredients: string[] } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
@@ -333,6 +334,7 @@ export default function Calculator() {
   const reset = useCallback(() => {
     setSelected({});
     setLastAppliedSignature(null);
+    setSignatureSnapshot(null);
   }, []);
 
   const useBowl = useCallback(
@@ -348,9 +350,11 @@ export default function Calculator() {
         next[item.id] = next[item.id] ?? 1;
       }
       setSelected(next);
-      // Pre-fill bowl name with the signature's name + lock so further edits don't override
+      // Snapshot the signature's ingredient set so we can detect modifications
+      // and append the "(custom)" suffix when the customer tweaks it.
+      setSignatureSnapshot({ name: bowl.name, ingredients: Object.keys(next).sort() });
       setBowlName(bowl.name);
-      setBowlNameCustom(true);
+      setBowlNameCustom(false);
       setView("edit");
       if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
     },
@@ -365,12 +369,32 @@ export default function Calculator() {
     return map;
   }, [items]);
 
-  // Auto-suggest bowl name from current selection (unless user has typed)
+  // Auto-suggest bowl name from current selection (unless user has typed manually).
+  // If the customer started from a signature, name = signature when unchanged,
+  // or "<signature> (custom)" once ingredients differ. If they remove ALL of the
+  // signature's ingredients, drop the snapshot and fall back to BYO auto-naming.
   useEffect(() => {
     if (bowlNameCustom) return;
-    const suggested = suggestBowlName(selected, items, lang);
-    setBowlName(suggested);
-  }, [selected, items, lang, bowlNameCustom]);
+    if (signatureSnapshot) {
+      const currentIds = Object.keys(selected);
+      const currentSet = new Set(currentIds);
+      const snapSet = new Set(signatureSnapshot.ingredients);
+      let overlap = 0;
+      for (const id of currentSet) if (snapSet.has(id)) overlap += 1;
+      const fullMatch = overlap === snapSet.size && currentSet.size === snapSet.size;
+      if (fullMatch) {
+        setBowlName(signatureSnapshot.name);
+        return;
+      }
+      if (overlap > 0) {
+        setBowlName(signatureSnapshot.name + " " + I18N[lang].signature_modified_suffix);
+        return;
+      }
+      // No overlap with the signature anymore — drop snapshot, use BYO naming
+      setSignatureSnapshot(null);
+    }
+    setBowlName(suggestBowlName(selected, items, lang));
+  }, [selected, items, lang, bowlNameCustom, signatureSnapshot]);
 
   // Save handler — Bundle 2 M2 wedge
   const handleSave = useCallback(async () => {
@@ -469,6 +493,7 @@ export default function Calculator() {
                   setSelected({});
                   setBowlName("");
                   setBowlNameCustom(false);
+                  setSignatureSnapshot(null);
                   setView("edit");
                 }}
               >

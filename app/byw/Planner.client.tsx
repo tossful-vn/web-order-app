@@ -18,7 +18,7 @@ type Macros = {
 type BowlMin = { id: string; name: string } & Macros;
 type AddonMin = {
   id: string;
-  kind: "drink" | "food";
+  kind: "drink" | "food" | "wrap" | "side";
   name_en: string;
   name_vn: string | null;
 } & Macros;
@@ -28,7 +28,7 @@ type WeekItemRow = {
   week_id: string;
   user_id: string;
   day_index: number;
-  item_kind: "bowl" | "drink" | "food" | "custom";
+  item_kind: "bowl" | "drink" | "food" | "wrap" | "side" | "custom";
   bowl_id: string | null;
   addon_id: string | null;
   custom_name: string | null;
@@ -42,11 +42,23 @@ type WeekItemRow = {
   addon: AddonMin | null;
 };
 
+type Signature = {
+  id: string;
+  name_en: string;
+  name_vn: string | null;
+  kcal: number;
+  protein_g: number;
+  fat_g: number;
+  carbs_g: number;
+  fibre_g: number;
+};
+
 type Props = {
   weekId: string;
   items: WeekItemRow[];
   savedBowls: BowlMin[];
   addons: AddonMin[];
+  signatures: Signature[];
 };
 
 function macrosOf(item: WeekItemRow) {
@@ -54,7 +66,7 @@ function macrosOf(item: WeekItemRow) {
   if (item.item_kind === "bowl" && item.bowl) {
     return { cal: num(item.bowl.kcal), protein: num(item.bowl.protein_g), fat: num(item.bowl.fat_g), carbs: num(item.bowl.carbs_g), fibre: num(item.bowl.fibre_g) };
   }
-  if ((item.item_kind === "drink" || item.item_kind === "food") && item.addon) {
+  if ((item.item_kind === "drink" || item.item_kind === "food" || item.item_kind === "wrap" || item.item_kind === "side") && item.addon) {
     return { cal: num(item.addon.kcal), protein: num(item.addon.protein_g), fat: num(item.addon.fat_g), carbs: num(item.addon.carbs_g), fibre: num(item.addon.fibre_g) };
   }
   if (item.item_kind === "custom") {
@@ -73,16 +85,18 @@ function nameOf(item: WeekItemRow, lang: "en" | "vi"): string {
 function iconOf(kind: WeekItemRow["item_kind"]): string {
   if (kind === "bowl") return "B";
   if (kind === "drink") return "D";
+  if (kind === "wrap") return "W";
+  if (kind === "side") return "S";
   if (kind === "food") return "F";
   return "?";
 }
 
-export default function Planner({ weekId: _weekId, items, savedBowls, addons }: Props) {
+export default function Planner({ weekId: _weekId, items, savedBowls, addons, signatures }: Props) {
   const [lang] = useLang();
   const str = BYW_STR[lang];
   const router = useRouter();
   const [openDay, setOpenDay] = useState<number | null>(null);
-  const [pickerTab, setPickerTab] = useState<"bowl" | "drink" | "food" | "custom">("bowl");
+  const [pickerTab, setPickerTab] = useState<"bowl" | "tossful" | "drink" | "custom">("bowl");
   const [pickerErr, setPickerErr] = useState<string | null>(null);
   const [busy, startTransition] = useTransition();
 
@@ -213,8 +227,8 @@ export default function Planner({ weekId: _weekId, items, savedBowls, addons }: 
 
             <div className="picker-tabs">
               <button className={pickerTab === "bowl" ? "on" : ""} onClick={() => setPickerTab("bowl")}>{str.picker_my_bowls}</button>
+              <button className={pickerTab === "tossful" ? "on" : ""} onClick={() => setPickerTab("tossful")}>{str.picker_tossful}</button>
               <button className={pickerTab === "drink" ? "on" : ""} onClick={() => setPickerTab("drink")}>{str.picker_drinks}</button>
-              <button className={pickerTab === "food" ? "on" : ""} onClick={() => setPickerTab("food")}>{str.picker_foods}</button>
               <button className={pickerTab === "custom" ? "on" : ""} onClick={() => setPickerTab("custom")}>{str.picker_custom}</button>
             </div>
 
@@ -247,18 +261,72 @@ export default function Planner({ weekId: _weekId, items, savedBowls, addons }: 
                 </div>
               )}
 
-              {(pickerTab === "drink" || pickerTab === "food") && (
+              {pickerTab === "drink" && (
                 <div className="picker-list">
-                  {addons.filter((a) => a.kind === pickerTab).map((a) => (
+                  {addons.filter((a) => a.kind === "drink").map((a) => (
                     <button
                       key={a.id}
                       className="picker-option"
                       disabled={busy}
-                      onClick={() => handleAdd({ dayIndex: openDay as 0|1|2|3|4|5|6, itemKind: pickerTab, addonId: a.id })}
+                      onClick={() => handleAdd({ dayIndex: openDay as 0|1|2|3|4|5|6, itemKind: "drink", addonId: a.id })}
                     >
-                      <div className="ico" style={{ background: pickerTab === "drink" ? "#F68C02" : "#FFE9C2", color: pickerTab === "drink" ? "#fff" : "#7D291A" }}>
-                        {pickerTab === "drink" ? "D" : "F"}
+                      <div className="ico" style={{ background: "#F68C02", color: "#fff" }}>D</div>
+                      <div className="body">
+                        <div className="name">{(lang === "vi" && a.name_vn) ? a.name_vn : a.name_en}</div>
+                        <div className="macros">{Math.round(Number(a.kcal ?? 0))} cal &middot; {Number(a.protein_g ?? 0).toFixed(0)}g protein</div>
                       </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {pickerTab === "tossful" && (
+                <div className="picker-list">
+                  {signatures.map((s) => (
+                    <button
+                      key={`sig-${s.id}`}
+                      className="picker-option"
+                      disabled={busy}
+                      onClick={() => handleAdd({
+                        dayIndex: openDay as 0|1|2|3|4|5|6,
+                        itemKind: "custom",
+                        customName: (lang === "vi" && s.name_vn) ? s.name_vn : s.name_en,
+                        customKcal: s.kcal,
+                        customProteinG: s.protein_g,
+                        customFatG: s.fat_g,
+                        customCarbsG: s.carbs_g,
+                        customFibreG: s.fibre_g,
+                      })}
+                    >
+                      <div className="ico" style={{ background: "#C0DD97", color: "#0F563D" }}>B</div>
+                      <div className="body">
+                        <div className="name">{(lang === "vi" && s.name_vn) ? s.name_vn : s.name_en}</div>
+                        <div className="macros">{s.kcal} cal &middot; {s.protein_g.toFixed(0)}g protein</div>
+                      </div>
+                    </button>
+                  ))}
+                  {addons.filter((a) => a.kind === "wrap").map((a) => (
+                    <button
+                      key={`wrap-${a.id}`}
+                      className="picker-option"
+                      disabled={busy}
+                      onClick={() => handleAdd({ dayIndex: openDay as 0|1|2|3|4|5|6, itemKind: "wrap", addonId: a.id })}
+                    >
+                      <div className="ico" style={{ background: "#FFE9C2", color: "#7D291A" }}>W</div>
+                      <div className="body">
+                        <div className="name">{(lang === "vi" && a.name_vn) ? a.name_vn : a.name_en}</div>
+                        <div className="macros">{Math.round(Number(a.kcal ?? 0))} cal &middot; {Number(a.protein_g ?? 0).toFixed(0)}g protein</div>
+                      </div>
+                    </button>
+                  ))}
+                  {addons.filter((a) => a.kind === "side").map((a) => (
+                    <button
+                      key={`side-${a.id}`}
+                      className="picker-option"
+                      disabled={busy}
+                      onClick={() => handleAdd({ dayIndex: openDay as 0|1|2|3|4|5|6, itemKind: "side", addonId: a.id })}
+                    >
+                      <div className="ico" style={{ background: "#F8E3F3", color: "#7D291A" }}>S</div>
                       <div className="body">
                         <div className="name">{(lang === "vi" && a.name_vn) ? a.name_vn : a.name_en}</div>
                         <div className="macros">{Math.round(Number(a.kcal ?? 0))} cal &middot; {Number(a.protein_g ?? 0).toFixed(0)}g protein</div>

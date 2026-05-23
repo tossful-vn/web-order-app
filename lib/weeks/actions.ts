@@ -96,8 +96,8 @@ export async function addWeekItem(input: {
   if (input.itemKind === "bowl") {
     if (!input.bowlId) return { error: "bowlId required for bowl" };
     row.bowl_id = input.bowlId;
-  } else if (input.itemKind === "drink" || input.itemKind === "food") {
-    if (!input.addonId) return { error: "addonId required for drink/food" };
+  } else if (input.itemKind === "drink" || input.itemKind === "food" || input.itemKind === "wrap" || input.itemKind === "side") {
+    if (!input.addonId) return { error: "addonId required for addon item" };
     row.addon_id = input.addonId;
   } else if (input.itemKind === "custom") {
     if (!input.customName) return { error: "customName required for custom" };

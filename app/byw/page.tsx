@@ -4,7 +4,7 @@ import { ensureDraftWeek } from "@/lib/weeks/actions";
 import Planner from "./Planner.client";
 import "./byw.css";
 
-export const metadata = { title: "Tuần của tôi · Tossful" };
+export const metadata = { title: "Tuan cua toi - Tossful" };
 
 export default async function BywPage() {
   const user = await requireUser();
@@ -31,14 +31,14 @@ export default async function BywPage() {
     .order("sort_order", { ascending: true });
   if (itemsErr) throw new Error(itemsErr.message);
 
-  // Saved bowls for the picker
+  // Saved bowls
   const { data: savedBowls } = await supabase
     .from("saved_bowls")
     .select("id, name, kcal, protein_g, fat_g, carbs_g, fibre_g")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
 
-  // Addons catalog
+  // Addons (drinks, wraps, sides — splits client-side by kind)
   const { data: addons } = await supabase
     .from("addons")
     .select("id, kind, name_en, name_vn, kcal, protein_g, fat_g, carbs_g, fibre_g")
@@ -46,11 +46,66 @@ export default async function BywPage() {
     .eq("in_menu", true)
     .order("sort_order", { ascending: true });
 
-  // Normalize supabase relational result: `bowl` and `addon` may come as arrays
-  // depending on PostgREST relation cardinality. Coerce to single object or null.
+  // Signatures — fetched from items (category='Signature') + recipe_components + item_nutrition.
+  // Compute macros server-side and pass as a pre-priced "tossful bowl" option for the picker.
+  const { data: sigItems } = await supabase
+    .from("items")
+    .select("id, name_en, name_vn, notes")
+    .eq("in_menu", true)
+    .eq("active", true)
+    .eq("category", "Signature")
+    .order("name_en", { ascending: true });
+
+  type Signature = {
+    id: string; name_en: string; name_vn: string | null;
+    kcal: number; protein_g: number; fat_g: number; carbs_g: number; fibre_g: number;
+  };
+  let signatures: Signature[] = [];
+  if (sigItems && sigItems.length > 0) {
+    const sigIds = sigItems.map((s) => s.id);
+    const { data: comps } = await supabase
+      .from("recipe_components")
+      .select("recipe_id, component_id, quantity_g")
+      .in("recipe_id", sigIds);
+    const componentIds = Array.from(new Set((comps ?? []).map((c) => c.component_id)));
+    const { data: nutritions } = await supabase
+      .from("item_nutrition")
+      .select("item_id, calories, protein_g, total_fat_g, carbs_g, fiber_g")
+      .in("item_id", componentIds.length > 0 ? componentIds : ["00000000-0000-0000-0000-000000000000"]);
+    type Nut = { item_id: string; calories: number | null; protein_g: number | null; total_fat_g: number | null; carbs_g: number | null; fiber_g: number | null };
+    const nutById = new Map<string, Nut>();
+    for (const n of (nutritions ?? []) as Nut[]) nutById.set(n.item_id, n);
+
+    signatures = sigItems.map((sig) => {
+      const sigComps = (comps ?? []).filter((c) => c.recipe_id === sig.id);
+      let cal = 0, protein = 0, fat = 0, carbs = 0, fibre = 0;
+      for (const c of sigComps) {
+        const nut = nutById.get(c.component_id);
+        if (!nut) continue;
+        const f = c.quantity_g / 100;
+        cal += (nut.calories ?? 0) * f;
+        protein += (nut.protein_g ?? 0) * f;
+        fat += (nut.total_fat_g ?? 0) * f;
+        carbs += (nut.carbs_g ?? 0) * f;
+        fibre += (nut.fiber_g ?? 0) * f;
+      }
+      return {
+        id: sig.id,
+        name_en: sig.name_en,
+        name_vn: sig.name_vn,
+        kcal: Math.round(cal),
+        protein_g: Number(protein.toFixed(1)),
+        fat_g: Number(fat.toFixed(1)),
+        carbs_g: Number(carbs.toFixed(1)),
+        fibre_g: Number(fibre.toFixed(1)),
+      };
+    });
+  }
+
+  // Normalize embedded relations (Supabase may return as arrays for some joins)
   type RawItem = {
     id: string; week_id: string; user_id: string; day_index: number;
-    item_kind: "bowl" | "drink" | "food" | "custom";
+    item_kind: "bowl" | "drink" | "food" | "wrap" | "side" | "custom";
     bowl_id: string | null; addon_id: string | null;
     custom_name: string | null; custom_kcal: number | null;
     custom_protein_g: number | null; custom_fat_g: number | null;
@@ -71,6 +126,7 @@ export default async function BywPage() {
       items={items}
       savedBowls={(savedBowls ?? []) as Parameters<typeof Planner>[0]["savedBowls"]}
       addons={(addons ?? []) as Parameters<typeof Planner>[0]["addons"]}
+      signatures={signatures}
     />
   );
 }

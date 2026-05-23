@@ -102,7 +102,7 @@ export type MacroKey = keyof typeof DAILY_RDI;
  * Phase 2 BYW additions (2026-05-23) — multi-item planning + addon catalog.
  */
 
-export type AddonKind = "drink" | "food";
+export type AddonKind = "drink" | "food" | "wrap" | "side";
 
 export type Addon = {
   id: string;
@@ -125,7 +125,7 @@ export type Addon = {
   updated_at: string;
 };
 
-export type WeekItemKind = "bowl" | "drink" | "food" | "custom";
+export type WeekItemKind = "bowl" | "drink" | "food" | "wrap" | "side" | "custom";
 
 export type WeekItem = {
   id: string;

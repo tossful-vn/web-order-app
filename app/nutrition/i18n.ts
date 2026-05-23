@@ -17,6 +17,7 @@ export type StringTable = {
   bowl_name_placeholder: string;
   bowl_name_hint: string;
   saving: string;
+  signature_modified_suffix: string;
   choose_q: string;
   start_sig: string;
   start_sig_desc: string;
@@ -67,6 +68,7 @@ const EN: StringTable = {
   bowl_name_placeholder: "Bowl name",
   bowl_name_hint: "Auto-named from your ingredients — tap to edit",
   saving: "Saving...",
+  signature_modified_suffix: "(custom)",
   choose_q: "How would you like to start?",
   start_sig: "Start from a signature",
   start_sig_desc: "Browse 7 Tossful recipes, then customise",
@@ -130,6 +132,7 @@ const VI_save_soon = "Sap co chuc nang luu";
 const VI_bowl_name_placeholder = "Tên bowl";
 const VI_bowl_name_hint = "Tu dat ten tu nguyen lieu — cham de sua";
 const VI_saving = "Dang luu...";
+const VI_signature_modified_suffix = "(chinh sua)";
 const VI_start_from_bowl = "Bắt đầu với tô này";
 const VI_pick_any = "chọn bất kỳ";
 const VI_save_header_named = "Đây là tô của {name}:";
@@ -201,6 +204,7 @@ const VI: StringTable = {
   bowl_name_placeholder: VI_bowl_name_placeholder,
   bowl_name_hint: VI_bowl_name_hint,
   saving: VI_saving,
+  signature_modified_suffix: VI_signature_modified_suffix,
   choose_q: VI_choose_q,
   start_sig: VI_start_sig,
   start_sig_desc: VI_start_sig_desc,
