@@ -4,6 +4,10 @@ import "./globals.css";
 
 const fraunces = Fraunces({
   subsets: ["latin", "latin-ext", "vietnamese"],
+  // Load BOTH normal and italic font files. Without italic, Fraunces upright
+  // is synthesized into italic by the browser — synthesis breaks composed
+  // Vietnamese diacritics (e.g. "Biết" renders as "Biê´t").
+  style: ["normal", "italic"],
   variable: "--font-fraunces",
   display: "swap",
 });
