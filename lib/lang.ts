@@ -15,6 +15,8 @@ export function getStoredLang(): Lang {
 export function persistLang(lang: Lang) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(STORAGE_KEY, lang);
+  // Also persist as a cookie so Server Components can read it.
+  document.cookie = STORAGE_KEY + "=" + lang + "; path=/; max-age=31536000; SameSite=Lax";
   document.documentElement.lang = lang;
   window.dispatchEvent(new CustomEvent<Lang>(EVENT_NAME, { detail: lang }));
 }
