@@ -34,6 +34,13 @@ export function lookupSignaturePhoto(name: string): string | undefined {
   if (SIG_PHOTO_MAP[name]) return SIG_PHOTO_MAP[name];
   const ascii = stripDiacritics(name);
   if (SIG_PHOTO_MAP[ascii]) return SIG_PHOTO_MAP[ascii];
+  // Wrap variants ("Fennel Fling - Wrap") fall back to the bowl photo
+  const withoutWrap = name.replace(/\s*-\s*Wrap\s*$/i, "").trim();
+  if (withoutWrap && withoutWrap !== name) {
+    if (SIG_PHOTO_MAP[withoutWrap]) return SIG_PHOTO_MAP[withoutWrap];
+    const asciiNoWrap = stripDiacritics(withoutWrap);
+    if (SIG_PHOTO_MAP[asciiNoWrap]) return SIG_PHOTO_MAP[asciiNoWrap];
+  }
   return undefined;
 }
 
