@@ -150,6 +150,10 @@ export default function Calculator() {
     let cancelled = false;
     (async () => {
       try {
+        // Visibility for debugging — confirm env vars + URL the client is hitting
+        console.log("[nutrition] Supabase URL:", process.env.NEXT_PUBLIC_SUPABASE_URL);
+        console.log("[nutrition] Anon key present:", !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY, "len:", process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.length);
+
         const { data: rawItems, error: itemErr } = await supabase
           .from("items")
           .select("id,name_en,name_vn,category,kind,tossful_portion_g,notes")
@@ -158,12 +162,20 @@ export default function Calculator() {
           .in("category", ["Base", "Topping", "Premium", "Dressing", "Signature"])
           .order("category", { ascending: true })
           .order("name_en", { ascending: true });
-        if (itemErr) throw new Error(itemErr.message);
+        if (itemErr) {
+          console.error("[nutrition] items fetch error:", itemErr);
+          throw new Error(`items: ${itemErr.message}`);
+        }
+        console.log("[nutrition] items returned:", rawItems?.length ?? 0);
 
         const { data: nutrition, error: nutErr } = await supabase
           .from("item_nutrition")
           .select("*");
-        if (nutErr) throw new Error(nutErr.message);
+        if (nutErr) {
+          console.error("[nutrition] item_nutrition fetch error:", nutErr);
+          throw new Error(`item_nutrition: ${nutErr.message}`);
+        }
+        console.log("[nutrition] item_nutrition rows:", nutrition?.length ?? 0);
 
         const byItemId: Record<string, Nutrition> = {};
         for (const n of (nutrition ?? []) as Nutrition[]) byItemId[n.item_id] = n;
@@ -398,7 +410,7 @@ export default function Calculator() {
                   return (
                     <div key={key} className="ring-item" data-macro={key}>
                       <div className="ring-wrap">
-                        <svg className="ring" viewBox="0 0 72 72">
+                        <svg className="nring" viewBox="0 0 72 72">
                           <circle className="bg" cx={36} cy={36} r={RING_R} />
                           <circle
                             className="fg"
@@ -496,8 +508,15 @@ export default function Calculator() {
         {tab === "byo" && (
           <div id="content">
             {loading && <div className="loader">Loading ingredients...</div>}
-            {error && <div className="err">{error}</div>}
-            {!loading && !error &&
+            {error && <div className="err">Failed to load ingredients: {error}</div>}
+            {!loading && !error && items.length === 0 && (
+              <div className="err">
+                No ingredients returned from Supabase. Open the browser console
+                (F12) and check for errors. Likely causes: env vars missing in
+                Vercel, RLS blocking anon SELECT, or wrong table names.
+              </div>
+            )}
+            {!loading && !error && items.length > 0 &&
               CATEGORY_ORDER.map((cat) => {
                 const list = items_by_cat[cat] ?? [];
                 if (list.length === 0) return null;

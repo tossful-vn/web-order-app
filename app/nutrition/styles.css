@@ -39,14 +39,14 @@
 .tossful-calc .igrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; }
 .tossful-calc .ring-item { text-align: center; position: relative; }
 .tossful-calc .ring-wrap { position: relative; width: 60px; height: 60px; margin: 0 auto; }
-.tossful-calc .ring { width: 60px; height: 60px; display: block; transform: rotate(-90deg); }
-.tossful-calc .ring .bg { fill: none; stroke: rgba(244,241,230,0.18); stroke-width: 6; }
-.tossful-calc .ring .fg { fill: none; stroke-width: 6; stroke-linecap: round; stroke-dasharray: 0 188.5; transition: stroke-dasharray 0.4s ease; }
-.tossful-calc .ring-item[data-macro="cal"] .ring .fg { stroke: #F4F1E6; }
-.tossful-calc .ring-item[data-macro="protein"] .ring .fg { stroke: #F8E3F3; }
-.tossful-calc .ring-item[data-macro="fat"] .ring .fg { stroke: #F68C02; }
-.tossful-calc .ring-item[data-macro="carbs"] .ring .fg { stroke: #FFE9C2; }
-.tossful-calc .ring-item[data-macro="fiber"] .ring .fg { stroke: #C0DD97; }
+.tossful-calc .nring { width: 60px; height: 60px; display: block; transform: rotate(-90deg); }
+.tossful-calc .nring .bg { fill: none; stroke: rgba(244,241,230,0.18); stroke-width: 6; }
+.tossful-calc .nring .fg { fill: none; stroke-width: 6; stroke-linecap: round; stroke-dasharray: 0 188.5; transition: stroke-dasharray 0.4s ease; }
+.tossful-calc .ring-item[data-macro="cal"] .nring .fg { stroke: #F4F1E6; }
+.tossful-calc .ring-item[data-macro="protein"] .nring .fg { stroke: #F8E3F3; }
+.tossful-calc .ring-item[data-macro="fat"] .nring .fg { stroke: #F68C02; }
+.tossful-calc .ring-item[data-macro="carbs"] .nring .fg { stroke: #FFE9C2; }
+.tossful-calc .ring-item[data-macro="fiber"] .nring .fg { stroke: #C0DD97; }
 .tossful-calc .ring-center { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
 .tossful-calc .ring-center .val { font-family: 'Fraunces', Georgia, serif; font-style: italic; font-size: 13px; line-height: 1; }
 .tossful-calc .ring-center .lbl { font-size: 7px; opacity: 0.75; text-transform: uppercase; letter-spacing: 0.4px; margin-top: 2px; line-height: 1; }
