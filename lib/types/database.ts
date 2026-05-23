@@ -97,3 +97,50 @@ export const DAILY_RDI = {
 } as const;
 
 export type MacroKey = keyof typeof DAILY_RDI;
+
+/**
+ * Phase 2 BYW additions (2026-05-23) — multi-item planning + addon catalog.
+ */
+
+export type AddonKind = "drink" | "food";
+
+export type Addon = {
+  id: string;
+  kind: AddonKind;
+  name_en: string;
+  name_vn: string | null;
+  description: string | null;
+  kcal: number | null;
+  protein_g: number | null;
+  fat_g: number | null;
+  carbs_g: number | null;
+  fibre_g: number | null;
+  sodium_mg: number | null;
+  photo_url: string | null;
+  active: boolean;
+  in_menu: boolean;
+  sort_order: number;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type WeekItemKind = "bowl" | "drink" | "food" | "custom";
+
+export type WeekItem = {
+  id: string;
+  week_id: string;
+  user_id: string;
+  day_index: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  item_kind: WeekItemKind;
+  bowl_id: string | null;
+  addon_id: string | null;
+  custom_name: string | null;
+  custom_kcal: number | null;
+  custom_protein_g: number | null;
+  custom_fat_g: number | null;
+  custom_carbs_g: number | null;
+  custom_fibre_g: number | null;
+  sort_order: number;
+  created_at: string;
+};
