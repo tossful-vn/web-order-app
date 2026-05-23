@@ -20,6 +20,7 @@ const STRINGS = {
     panel_label: "% of daily target",
     macro_labels: { cal: "CAL", protein: "PROTEIN", fat: "FAT", carbs: "CARBS", fiber: "FIBER" },
     sections: { base: "Base", topping: "Topping", premium: "Premium", dressing: "Dressing", free: "Free" },
+    included: "Included",
   },
   vi: {
     metadata: "Bowl · Tossful",
@@ -34,6 +35,7 @@ const STRINGS = {
     panel_label: "% mục tiêu hôm nay",
     macro_labels: { cal: "CAL", protein: "ĐẠM", fat: "BÉO", carbs: "T.BỘT", fiber: "C.XƠ" },
     sections: { base: "Base", topping: "Topping", premium: "Premium", dressing: "Dressing", free: "Free" },
+    included: "Đã bao gồm",
   },
 } as const;
 
@@ -41,7 +43,7 @@ export async function generateMetadata() {
   return { title: STRINGS[getServerLang()].metadata };
 }
 
-type ItemEntry = { id?: string; name: string; grams: number };
+type ItemEntry = { id?: string; name: string; grams: number; included?: boolean };
 type SectionMap = {
   base: ItemEntry[];
   toppings: ItemEntry[];
@@ -83,6 +85,29 @@ export default async function BowlDetailPage({
   };
   if (comp.cot && sections.base.length === 0) sections.base = [comp.cot];
   if (comp.xot && sections.dressing.length === 0) sections.dressing = [comp.xot];
+
+  // Merge any "fixed" components (locked signature ingredients like the
+  // tortilla in a wrap variant) into their respective sections with an
+  // `included: true` flag so the UI can show an "Included" badge.
+  for (const f of comp.fixed ?? []) {
+    const entry: ItemEntry = { id: f.id, name: f.name, grams: f.grams, included: true };
+    switch (f.category) {
+      case "Base":
+        sections.base.push(entry);
+        break;
+      case "Topping":
+        sections.toppings.push(entry);
+        break;
+      case "Premium":
+        sections.proteins.push(entry);
+        break;
+      case "Dressing":
+        sections.dressing.push(entry);
+        break;
+      default:
+        sections.free.push(entry);
+    }
+  }
 
   const totals = {
     cal: Number(b.kcal ?? 0),
@@ -140,7 +165,14 @@ export default async function BowlDetailPage({
                         key={`${sec.key}-${i}`}
                         className="px-1 py-2.5 flex justify-between items-center"
                       >
-                        <span className="text-kale-800">{it.name}</span>
+                        <span className="text-kale-800">
+                          {it.name}
+                          {it.included && (
+                            <span className="ml-2 inline-block text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-kale-100 text-kale-700">
+                              {s.included}
+                            </span>
+                          )}
+                        </span>
                         <span className="text-sm text-kale-600 font-mono">
                           {formatGrams(it.grams)}g
                         </span>

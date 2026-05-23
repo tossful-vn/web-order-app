@@ -27,6 +27,7 @@ export type StringTable = {
   browse_h: string;
   browse_sub: string;
   start_from_bowl: string; pick_any: string;
+  included_label: string; included_hint: string;
   cat_Base: string; cat_Topping: string; cat_Premium: string; cat_Dressing: string; cat_Free: string;
   save_header_named: string; save_header_anon: string;
   save_nutrition_label: string; name_placeholder: string;
@@ -77,7 +78,9 @@ const EN: StringTable = {
   back_to_start: "Back to start",
   browse_h: "Pick a signature",
   browse_sub: "Tap a bowl to load it, then tweak in the next step.",
-  start_from_bowl: "Start from this bowl",
+  start_from_bowl: "Start from this",
+  included_label: "Included",
+  included_hint: "Part of the wrap — can't be removed.",
   pick_any: "pick any",
   cat_Base: "Base", cat_Topping: "Toppings", cat_Premium: "Premium protein",
   cat_Dressing: "Dressing", cat_Free: "Free extras",
@@ -133,7 +136,9 @@ const VI_bowl_name_placeholder = "Tên bowl";
 const VI_bowl_name_hint = "Tu dat ten tu nguyen lieu — cham de sua";
 const VI_saving = "Dang luu...";
 const VI_signature_modified_suffix = "(chinh sua)";
-const VI_start_from_bowl = "Bắt đầu với tô này";
+const VI_start_from_bowl = "Bắt đầu từ món này";
+const VI_included_label = "Đã bao gồm";
+const VI_included_hint = "Là phần của wrap — không thể bỏ.";
 const VI_pick_any = "chọn bất kỳ";
 const VI_save_header_named = "Đây là tô của {name}:";
 const VI_save_header_anon = "Đây là tô của bạn:";
@@ -214,6 +219,7 @@ const VI: StringTable = {
   browse_h: VI_browse_h,
   browse_sub: VI_browse_sub,
   start_from_bowl: VI_start_from_bowl, pick_any: VI_pick_any,
+  included_label: VI_included_label, included_hint: VI_included_hint,
   cat_Base: "Base", cat_Topping: "Topping", cat_Premium: "Premium",
   cat_Dressing: "Dressing", cat_Free: "Free",
   save_header_named: VI_save_header_named, save_header_anon: VI_save_header_anon,

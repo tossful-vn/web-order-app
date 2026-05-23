@@ -3,13 +3,13 @@ import { Fraunces, Questrial } from "next/font/google";
 import "./globals.css";
 
 const fraunces = Fraunces({
-  subsets: ["latin"],
+  subsets: ["latin", "latin-ext", "vietnamese"],
   variable: "--font-fraunces",
   display: "swap",
 });
 
 const questrial = Questrial({
-  subsets: ["latin"],
+  subsets: ["latin", "latin-ext", "vietnamese"],
   weight: "400",
   variable: "--font-questrial",
   display: "swap",

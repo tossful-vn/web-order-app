@@ -44,6 +44,13 @@ export type BowlComposition = {
   dressing?: { id: string; name: string; grams: number };
   cot?: { id: string; name: string; grams: number };
   xot?: { id: string; name: string; grams: number };
+  /**
+   * Components included by a signature recipe that the customer cannot
+   * remove or edit (e.g. the tortilla in a wrap variant). Rendered
+   * alongside the editable selection but marked "included" on the
+   * bowl detail page.
+   */
+  fixed?: Array<{ id: string; name: string; grams: number; category: string }>;
   notes?: string;
 };
 

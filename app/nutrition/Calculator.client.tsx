@@ -37,7 +37,19 @@ type Item = {
   kind: string | null;
   tossful_portion_g: number | null;
   notes?: string | null;
+  in_menu: boolean;
+  customizable?: boolean;
   nutrition?: Nutrition | null;
+};
+
+/** Component from a signature recipe that the customer cannot edit. */
+type LockedComponent = {
+  id: string;
+  name_en: string;
+  name_vn: string | null;
+  category: string;
+  quantity_g: number;
+  nutrition: Nutrition | null;
 };
 
 type RecipeComponent = {
@@ -52,7 +64,10 @@ type SigBowl = {
   name: string;
   tagline: string | null;
   total_g: number | null;
+  customizable: boolean;
   components: RecipeComponent[];
+  /** Non-in_menu components — included if customer customizes this signature. */
+  lockedComponents: LockedComponent[];
   macros: {
     calories: number;
     protein_g: number;
@@ -148,6 +163,12 @@ export default function Calculator() {
   const [bowlName, setBowlName] = useState<string>("");
   const [bowlNameCustom, setBowlNameCustom] = useState(false);
   const [signatureSnapshot, setSignatureSnapshot] = useState<{ name: string; ingredients: string[] } | null>(null);
+  /**
+   * Components included by the currently-applied signature that the customer
+   * cannot remove (e.g. tortilla in a wrap variant). Their macros are added
+   * to totals and they're saved into composition.fixed[] on save.
+   */
+  const [lockedComponents, setLockedComponents] = useState<LockedComponent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
@@ -167,10 +188,13 @@ export default function Calculator() {
         console.log("[nutrition] Supabase URL:", process.env.NEXT_PUBLIC_SUPABASE_URL);
         console.log("[nutrition] Anon key present:", !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY, "len:", process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.length);
 
+        // NOTE: do NOT filter on in_menu here. Some recipe components (e.g.
+        // tortilla in wrap variants) are staff-only items with in_menu=false,
+        // and the calculator needs their nutrition to compute wrap macros. The
+        // BYO picker filters by in_menu downstream when building byoItems.
         const { data: rawItems, error: itemErr } = await supabase
           .from("items")
-          .select("id,name_en,name_vn,category,kind,tossful_portion_g,notes")
-          .eq("in_menu", true)
+          .select("id,name_en,name_vn,category,kind,tossful_portion_g,notes,in_menu,customizable")
           .eq("active", true)
           .in("category", ["Base", "Topping", "Premium", "Dressing", "Signature"])
           .order("category", { ascending: true })
@@ -218,19 +242,42 @@ export default function Calculator() {
             const tagSrc = s.notes?.split("|")[0]?.trim() ?? "";
             const tagline = tagSrc.length > 0 && tagSrc.length < 60 ? tagSrc : null;
             const components = (byBowl[s.id] ?? []).sort((a, b) => a.sort_order - b.sort_order);
+            // Locked components: any recipe component whose item is NOT in_menu
+            // (e.g. the tortilla in a wrap variant). These can't be removed by
+            // the customer in BYO edit mode and are auto-included in totals.
+            const lockedComponents: LockedComponent[] = [];
+            for (const c of components) {
+              const ci = enriched.find((i) => i.id === c.component_id);
+              if (!ci) continue;
+              if (ci.in_menu) continue;
+              lockedComponents.push({
+                id: ci.id,
+                name_en: ci.name_en,
+                name_vn: ci.name_vn,
+                category: ci.category,
+                quantity_g: c.quantity_g,
+                nutrition: ci.nutrition ?? null,
+              });
+            }
             return {
               id: s.id,
               name: s.name_en,
               tagline,
               total_g: s.tossful_portion_g,
+              customizable: s.customizable !== false, // default true if undefined
               components,
+              lockedComponents,
               macros: computeBowlMacros(components, enriched),
             };
           });
         }
 
-        // Strip Signature items from the BYO list
-        const byoItems = enriched.filter((i) => i.category !== "Signature");
+        // BYO picker only shows ingredient items that are in_menu.
+        // (Tortilla and other staff-only components are fetched for the
+        // signature/wrap macro calc but excluded from the picker.)
+        const byoItems = enriched.filter(
+          (i) => i.category !== "Signature" && i.in_menu,
+        );
 
         if (cancelled) return;
         setItems(byoItems);
@@ -261,8 +308,18 @@ export default function Calculator() {
       out.carbs += m.carbs_g * qty;
       out.fiber += m.fiber_g * qty;
     }
+    // Add macros from locked components (tortilla in wraps, etc.).
+    for (const lc of lockedComponents) {
+      if (!lc.nutrition) continue;
+      const factor = lc.quantity_g / 100;
+      out.cal += (lc.nutrition.calories ?? 0) * factor;
+      out.protein += (lc.nutrition.protein_g ?? 0) * factor;
+      out.fat += (lc.nutrition.total_fat_g ?? 0) * factor;
+      out.carbs += (lc.nutrition.carbs_g ?? 0) * factor;
+      out.fiber += (lc.nutrition.fiber_g ?? 0) * factor;
+    }
     return out;
-  }, [selected, items]);
+  }, [selected, items, lockedComponents]);
 
   const countsByCategory = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -336,12 +393,14 @@ export default function Calculator() {
     setSelected({});
     setLastAppliedSignature(null);
     setSignatureSnapshot(null);
+    setLockedComponents([]);
   }, []);
 
   const useBowl = useCallback(
     (bowlId: string) => {
       const bowl = signatureBowls.find((b) => b.id === bowlId);
       if (!bowl) return;
+      if (!bowl.customizable) return; // safety: button shouldn't be visible
       setLastAppliedSignature(bowl.name);
       const next: Record<string, number> = {};
       for (const comp of bowl.components) {
@@ -351,6 +410,9 @@ export default function Calculator() {
         next[item.id] = next[item.id] ?? 1;
       }
       setSelected(next);
+      // Locked components (e.g. tortilla in a wrap) — included in macros and
+      // shown as read-only in edit mode, not removable by customer.
+      setLockedComponents(bowl.lockedComponents);
       // Snapshot the signature's ingredient set so we can detect modifications
       // and append the "(custom)" suffix when the customer tweaks it.
       setSignatureSnapshot({ name: bowl.name, ingredients: Object.keys(next).sort() });
@@ -424,6 +486,17 @@ export default function Calculator() {
       proteins: (byCategory["Premium"] ?? []).map(toEntry),
       toppings: (byCategory["Topping"] ?? []).map(toEntry),
       dressing: (byCategory["Dressing"] ?? [])[0] ? toEntry((byCategory["Dressing"] ?? [])[0]) : undefined,
+      // Locked components (e.g. tortilla in a wrap) — stored separately so
+      // the bowl detail page can render them with an "Included" badge and
+      // they're never lost if categories change shape later.
+      fixed: lockedComponents.length > 0
+        ? lockedComponents.map((lc) => ({
+            id: lc.id,
+            name: lang === "vi" && lc.name_vn ? lc.name_vn : lc.name_en,
+            grams: lc.quantity_g,
+            category: lc.category,
+          }))
+        : undefined,
       notes: lastAppliedSignature ? "From signature: " + lastAppliedSignature : undefined,
     };
     const payload = {
@@ -465,7 +538,7 @@ export default function Calculator() {
       }
       router.push("/login?next=/account");
     }
-  }, [selected, items, lang, bowlName, totals, lastAppliedSignature, supabase, router]);
+  }, [selected, items, lang, bowlName, totals, lastAppliedSignature, lockedComponents, supabase, router]);
 
   return (
     <div className="tossful-calc">
@@ -594,11 +667,17 @@ export default function Calculator() {
               </div>
             ) : (
               signatureBowls.map((b) => {
-                const ingsList = b.components
+                // Build ingredient list — include both in_menu (in `items`) and
+                // locked components (e.g. tortilla in wraps) so customer sees
+                // everything that's in the dish.
+                const inMenuNames = b.components
                   .map((c) => items.find((i) => i.id === c.component_id))
                   .filter((it): it is Item => !!it)
-                  .map((it) => pickName(it, lang))
-                  .join(" · ");
+                  .map((it) => pickName(it, lang));
+                const lockedNames = b.lockedComponents.map((lc) =>
+                  lang === "vi" && lc.name_vn ? lc.name_vn : lc.name_en,
+                );
+                const ingsList = [...inMenuNames, ...lockedNames].join(" · ");
                 const photo = lookupSignaturePhoto(b.name);
                 return (
                   <div key={b.id} className="sig-card">
@@ -630,9 +709,11 @@ export default function Calculator() {
                         </div>
                       </div>
                       <div className="ings">{ingsList}</div>
-                      <button className="use-btn" onClick={() => useBowl(b.id)}>
-                        {str.start_from_bowl} <i className="ti ti-arrow-right" aria-hidden="true" />
-                      </button>
+                      {b.customizable && (
+                        <button className="use-btn" onClick={() => useBowl(b.id)}>
+                          {str.start_from_bowl} <i className="ti ti-arrow-right" aria-hidden="true" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -651,6 +732,34 @@ export default function Calculator() {
                 No ingredients returned from Supabase. Open the browser console
                 (F12) and check for errors. Likely causes: env vars missing in
                 Vercel, RLS blocking anon SELECT, or wrong table names.
+              </div>
+            )}
+            {/* Locked components from the chosen signature (e.g. tortilla in a wrap).
+                Read-only chips — counted in macros, can't be removed. */}
+            {!loading && !error && lockedComponents.length > 0 && (
+              <div className="section" data-locked="true">
+                <div className="h">
+                  <h3>{str.included_label}</h3>
+                  <div className="meta">
+                    <span className="hint">{str.included_hint}</span>
+                  </div>
+                </div>
+                <div className="chips">
+                  {lockedComponents.map((lc) => {
+                    const displayName = lang === "vi" && lc.name_vn ? lc.name_vn : lc.name_en;
+                    return (
+                      <div
+                        key={lc.id}
+                        className="chip on locked"
+                        aria-disabled="true"
+                        style={{ cursor: "default", opacity: 0.85 }}
+                      >
+                        <span>{displayName}</span>
+                        <span className="qty">{lc.quantity_g}g</span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
             {!loading && !error && items.length > 0 &&
