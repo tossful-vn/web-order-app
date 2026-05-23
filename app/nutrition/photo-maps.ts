@@ -12,8 +12,10 @@ export const CATEGORY_BG: Record<Category, string> = {
   Dressing: "#0F563D", // kale green
 };
 
-// Signature bowl English name -> flatlay photo filename
+// Signature bowl name -> flatlay photo filename.
+// Includes both Vietnamese-diacritic and ASCII variants so we hit on either.
 export const SIG_PHOTO_MAP: Record<string, string> = {
+  "Biết Điều": "signature_biet_dieu.png",
   "Biet Dieu": "signature_biet_dieu.png",
   "Dijon Vu": "signature_dijon_vu.png",
   "Fennel Fling": "signature_fennel_fling.png",
@@ -22,6 +24,18 @@ export const SIG_PHOTO_MAP: Record<string, string> = {
   "Mi-So-Cool": "signature_misocool.png",
   "Thai Me Up": "signature_thai_me_up.png",
 };
+
+// Strip Vietnamese diacritics for lookups so "Biết Điều" matches "Biet Dieu".
+function stripDiacritics(s: string): string {
+  return s.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[Đđ]/g, "D");
+}
+
+export function lookupSignaturePhoto(name: string): string | undefined {
+  if (SIG_PHOTO_MAP[name]) return SIG_PHOTO_MAP[name];
+  const ascii = stripDiacritics(name);
+  if (SIG_PHOTO_MAP[ascii]) return SIG_PHOTO_MAP[ascii];
+  return undefined;
+}
 
 // Ingredient English name -> photo filename
 export const PHOTO_MAP: Record<string, string> = {

@@ -12,6 +12,7 @@ import {
   DAILY,
   PHOTO_MAP,
   SIG_PHOTO_MAP,
+  lookupSignaturePhoto,
   ingredientIcon,
   type Category,
   type MacroKey,
@@ -598,7 +599,7 @@ export default function Calculator() {
                   .filter((it): it is Item => !!it)
                   .map((it) => pickName(it, lang))
                   .join(" · ");
-                const photo = SIG_PHOTO_MAP[b.name];
+                const photo = lookupSignaturePhoto(b.name);
                 return (
                   <div key={b.id} className="sig-card">
                     <div className="photo">
@@ -610,7 +611,6 @@ export default function Calculator() {
                     </div>
                     <div className="body">
                       <h4>{b.name}</h4>
-                      {b.tagline && <div className="tag">{b.tagline}</div>}
                       <div className="macros">
                         <div className="m">
                           <div className="v">{Math.round(b.macros.calories)}</div>
