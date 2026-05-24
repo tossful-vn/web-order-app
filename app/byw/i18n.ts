@@ -32,6 +32,10 @@ const VI_signin_first = "Đăng nhập để lên kế hoạch tuần.";
 const VI_must_try = "Phải thử";
 const VI_must_try_empty = "Chưa có món nào. Mở Bowl của bạn rồi bấm hình trái tim để đánh dấu Phải thử.";
 const VI_must_try_open = "Mở Bowl của tôi";
+const VI_picker_saved_bowls = "Bowl đã lưu";
+const VI_picker_sub_bowls = "Bowl";
+const VI_picker_sub_wraps = "Cuộn";
+const VI_picker_sub_sides = "Món thêm";
 
 const EN_days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
 const EN_days_short = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
@@ -69,6 +73,10 @@ export const BYW_STR = {
     must_try: "Must Try",
     must_try_empty: "Nothing here yet. Open Your Bowls and tap the heart to mark a bowl as Must Try.",
     must_try_open: "Open My Bowls",
+    picker_saved_bowls: "Saved Bowls",
+    picker_sub_bowls: "Bowls",
+    picker_sub_wraps: "Wraps",
+    picker_sub_sides: "Sides",
     macro_cal: "CAL", macro_protein: "PROTEIN", macro_fat: "FAT", macro_carbs: "CARBS", macro_fiber: "FIBER",
   },
   vi: {
@@ -103,6 +111,10 @@ export const BYW_STR = {
     must_try: VI_must_try,
     must_try_empty: VI_must_try_empty,
     must_try_open: VI_must_try_open,
+    picker_saved_bowls: VI_picker_saved_bowls,
+    picker_sub_bowls: VI_picker_sub_bowls,
+    picker_sub_wraps: VI_picker_sub_wraps,
+    picker_sub_sides: VI_picker_sub_sides,
     macro_cal: "CAL",
     macro_protein: "ĐẠM",
     macro_fat: "BÉO",

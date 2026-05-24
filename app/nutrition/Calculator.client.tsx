@@ -705,7 +705,7 @@ export default function Calculator() {
                       {b.isBestSeller && (
                         <svg
                           className="best-seller-badge"
-                          viewBox="0 0 24 32"
+                          viewBox="0 0 24 24"
                           xmlns="http://www.w3.org/2000/svg"
                           role="img"
                           aria-label={lang === "vi" ? "Bán chạy" : "Best Seller"}
@@ -713,7 +713,11 @@ export default function Calculator() {
                           <title>{lang === "vi" ? "Bán chạy" : "Best Seller"}</title>
                           <path
                             fill="#F68C02"
-                            d="M12 1 C 13 6, 17 9, 18 13 C 19 14, 19 15, 18.5 15.5 C 17.5 14.5, 16 14, 15 14.5 C 16 16, 17 18, 17 20 C 17 22, 16 23, 14.5 23 C 13.5 23, 13 22, 13 21 C 13 22.5, 12 23, 11 23 C 9 23, 7 21, 7 18 C 7 16, 7.5 14.5, 8 13.5 C 8 16, 9 17, 10 17 C 10 13, 11 9, 12 1 Z"
+                            d="M15.362 5.214A8.252 8.252 0 0 1 12 21 8.25 8.25 0 0 1 6.038 7.047 8.287 8.287 0 0 0 9 9.601a8.983 8.983 0 0 1 3.361-6.867 8.21 8.21 0 0 0 3 2.48z"
+                          />
+                          <path
+                            fill="#FFE9C2"
+                            d="M12 18a3.75 3.75 0 0 0 .495-7.467 5.99 5.99 0 0 0-1.925 3.546 5.974 5.974 0 0 1-2.133-1.001A3.75 3.75 0 0 0 12 18z"
                           />
                         </svg>
                       )}

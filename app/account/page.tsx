@@ -18,6 +18,8 @@ const STRINGS = {
     metadata_title: "Your bowls · Tossful",
     must_try_add: "Mark as Must Try",
     must_try_remove: "Remove from Must Try",
+    section_must_try: "Must Try",
+    section_saved_bowls: "All saved bowls",
   },
   vi: {
     title: "Bowl của bạn",
@@ -31,6 +33,8 @@ const STRINGS = {
     metadata_title: "Bowl của bạn · Tossful",
     must_try_add: "Đánh dấu Phải thử",
     must_try_remove: "Bỏ khỏi Phải thử",
+    section_must_try: "Phải thử",
+    section_saved_bowls: "Tất cả bowl đã lưu",
   },
 } as const;
 
@@ -96,8 +100,10 @@ export default async function AccountPage() {
           </Link>
         </div>
       ) : (
-        <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {list.map((b) => {
+        (() => {
+          const favs = list.filter((b) => b.is_favourite === true);
+          const rest = list.filter((b) => b.is_favourite !== true);
+          const renderCard = (b: BowlRow) => {
             const totals = {
               cal: Number(b.kcal ?? 0),
               protein: Number(b.protein_g ?? 0),
@@ -124,7 +130,6 @@ export default async function AccountPage() {
                     {new Date(b.created_at).toLocaleDateString(dateLocale)}
                   </div>
                 </Link>
-                {/* Heart toggle — absolute positioned over the link, higher z-index */}
                 <form
                   action={toggleFavourite}
                   className="absolute top-3 right-3 z-10"
@@ -136,7 +141,6 @@ export default async function AccountPage() {
                     title={isFav ? s.must_try_remove : s.must_try_add}
                     className="flex items-center justify-center w-9 h-9 rounded-full bg-white border border-kale-100 hover:bg-kale-50 hover:border-kale-300 transition"
                   >
-                    {/* Heart SVG — filled brand-orange when favourited, outlined kale otherwise */}
                     <svg
                       viewBox="0 0 24 24"
                       width="18"
@@ -154,8 +158,36 @@ export default async function AccountPage() {
                 </form>
               </li>
             );
-          })}
-        </ul>
+          };
+          return (
+            <>
+              {favs.length > 0 && (
+                <section>
+                  <h2 className="font-display italic text-2xl text-kale-700 mb-4 flex items-center gap-2">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="#F68C02" stroke="#F68C02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                    </svg>
+                    {s.section_must_try}
+                    <span className="text-sm font-body text-kale-500 not-italic">({favs.length})</span>
+                  </h2>
+                  <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {favs.map(renderCard)}
+                  </ul>
+                </section>
+              )}
+              {rest.length > 0 && (
+                <section>
+                  <h2 className="font-display text-2xl text-kale-700 mb-4">
+                    {favs.length > 0 ? s.section_saved_bowls : s.title}
+                  </h2>
+                  <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {rest.map(renderCard)}
+                  </ul>
+                </section>
+              )}
+            </>
+          );
+        })()
       )}
     </div>
   );

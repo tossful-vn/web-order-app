@@ -162,59 +162,11 @@ export default function Planner({ weekId: _weekId, items, savedBowls, addons, si
 
   const macroLabels = { cal: str.macro_cal, protein: str.macro_protein, fat: str.macro_fat, carbs: str.macro_carbs, fiber: str.macro_fiber };
 
-  // Must Try — favourited saved bowls, surfaced at the top
-  const mustTryBowls = savedBowls.filter((b) => b.is_favourite === true);
-
   return (
     <div className="byw-page">
       <div className="byw-app">
         <h1 className="byw-hero-h1">{str.page_title}</h1>
         <p className="byw-hero-p">{str.page_sub}</p>
-
-        {/* Must Try — favourited saved bowls */}
-        <section className="must-try-section">
-          <div className="must-try-head">
-            <h2 className="must-try-h2">
-              <span className="must-try-heart" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="#F68C02" stroke="#F68C02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-                </svg>
-              </span>
-              {str.must_try}
-              {mustTryBowls.length > 0 && (
-                <span className="must-try-count">{mustTryBowls.length}</span>
-              )}
-            </h2>
-          </div>
-          {mustTryBowls.length === 0 ? (
-            <div className="must-try-empty">
-              <p>{str.must_try_empty}</p>
-              <Link href="/account" className="must-try-empty-cta">
-                {str.must_try_open} →
-              </Link>
-            </div>
-          ) : (
-            <div className="must-try-row">
-              {mustTryBowls.map((b) => (
-                <Link
-                  key={b.id}
-                  href={`/account/bowls/${b.id}`}
-                  className="must-try-card"
-                >
-                  <div className="must-try-card-name">{b.name}</div>
-                  <div className="must-try-card-macros">
-                    <span className="m">
-                      <strong>{Math.round(Number(b.kcal ?? 0))}</strong> {str.macro_cal.toLowerCase()}
-                    </span>
-                    <span className="m">
-                      <strong>{Math.round(Number(b.protein_g ?? 0))}g</strong> {str.macro_protein.toLowerCase()}
-                    </span>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
-        </section>
 
         {[0, 1, 2, 3, 4, 5, 6].map((d) => {
           const dayItems = itemsByDay[d];
@@ -291,20 +243,42 @@ export default function Planner({ weekId: _weekId, items, savedBowls, addons, si
                       <Link href="/nutrition">{str.picker_open_calc}</Link>
                     </div>
                   ) : (
-                    savedBowls.map((b) => (
-                      <button
-                        key={b.id}
-                        className="picker-option"
-                        disabled={busy}
-                        onClick={() => handleAdd({ dayIndex: openDay as 0|1|2|3|4|5|6, itemKind: "bowl", bowlId: b.id })}
-                      >
-                        <div className="ico">B</div>
-                        <div className="body">
-                          <div className="name">{b.name}</div>
-                          <div className="macros">{Math.round(Number(b.kcal ?? 0))} cal &middot; {Number(b.protein_g ?? 0).toFixed(0)}g protein</div>
-                        </div>
-                      </button>
-                    ))
+                    <>
+                      {(() => {
+                        const favs = savedBowls.filter((b) => b.is_favourite === true);
+                        const rest = savedBowls.filter((b) => b.is_favourite !== true);
+                        const renderBowl = (b: BowlMin) => (
+                          <button
+                            key={b.id}
+                            className="picker-option"
+                            disabled={busy}
+                            onClick={() => handleAdd({ dayIndex: openDay as 0|1|2|3|4|5|6, itemKind: "bowl", bowlId: b.id })}
+                          >
+                            <div className="ico">B</div>
+                            <div className="body">
+                              <div className="name">{b.name}</div>
+                              <div className="macros">{Math.round(Number(b.kcal ?? 0))} cal &middot; {Number(b.protein_g ?? 0).toFixed(0)}g protein</div>
+                            </div>
+                          </button>
+                        );
+                        return (
+                          <>
+                            {favs.length > 0 && (
+                              <>
+                                <div className="picker-subheading">{str.must_try}</div>
+                                {favs.map(renderBowl)}
+                              </>
+                            )}
+                            {rest.length > 0 && (
+                              <>
+                                {favs.length > 0 && <div className="picker-subheading">{str.picker_saved_bowls}</div>}
+                                {rest.map(renderBowl)}
+                              </>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </>
                   )}
                 </div>
               )}
@@ -330,57 +304,80 @@ export default function Planner({ weekId: _weekId, items, savedBowls, addons, si
 
               {pickerTab === "tossful" && (
                 <div className="picker-list">
-                  {signatures.map((s) => (
-                    <button
-                      key={`sig-${s.id}`}
-                      className="picker-option"
-                      disabled={busy}
-                      onClick={() => handleAdd({
-                        dayIndex: openDay as 0|1|2|3|4|5|6,
-                        itemKind: "custom",
-                        customName: (lang === "vi" && s.name_vn) ? s.name_vn : s.name_en,
-                        customKcal: s.kcal,
-                        customProteinG: s.protein_g,
-                        customFatG: s.fat_g,
-                        customCarbsG: s.carbs_g,
-                        customFibreG: s.fibre_g,
-                      })}
-                    >
-                      <div className="ico" style={{ background: "#C0DD97", color: "#0F563D" }}>B</div>
-                      <div className="body">
-                        <div className="name">{(lang === "vi" && s.name_vn) ? s.name_vn : s.name_en}</div>
-                        <div className="macros">{s.kcal} cal &middot; {s.protein_g.toFixed(0)}g protein</div>
-                      </div>
-                    </button>
-                  ))}
-                  {addons.filter((a) => a.kind === "wrap").map((a) => (
-                    <button
-                      key={`wrap-${a.id}`}
-                      className="picker-option"
-                      disabled={busy}
-                      onClick={() => handleAdd({ dayIndex: openDay as 0|1|2|3|4|5|6, itemKind: "wrap", addonId: a.id })}
-                    >
-                      <div className="ico" style={{ background: "#FFE9C2", color: "#7D291A" }}>W</div>
-                      <div className="body">
-                        <div className="name">{(lang === "vi" && a.name_vn) ? a.name_vn : a.name_en}</div>
-                        <div className="macros">{Math.round(Number(a.kcal ?? 0))} cal &middot; {Number(a.protein_g ?? 0).toFixed(0)}g protein</div>
-                      </div>
-                    </button>
-                  ))}
-                  {addons.filter((a) => a.kind === "side").map((a) => (
-                    <button
-                      key={`side-${a.id}`}
-                      className="picker-option"
-                      disabled={busy}
-                      onClick={() => handleAdd({ dayIndex: openDay as 0|1|2|3|4|5|6, itemKind: "side", addonId: a.id })}
-                    >
-                      <div className="ico" style={{ background: "#F8E3F3", color: "#7D291A" }}>S</div>
-                      <div className="body">
-                        <div className="name">{(lang === "vi" && a.name_vn) ? a.name_vn : a.name_en}</div>
-                        <div className="macros">{Math.round(Number(a.kcal ?? 0))} cal &middot; {Number(a.protein_g ?? 0).toFixed(0)}g protein</div>
-                      </div>
-                    </button>
-                  ))}
+                  {(() => {
+                    // Split signatures by wrap suffix; group with addons.
+                    const isWrapName = (n: string) => /\s*-\s*Wrap\s*$/i.test(n);
+                    const displayName = (n: string) => {
+                      const m = n.match(/^(.+?)\s*-\s*Wrap\s*$/i);
+                      return m ? `WRAP | ${m[1].trim()}` : n;
+                    };
+                    const sigBowls = signatures.filter((sg) => !isWrapName(sg.name_en));
+                    const sigWraps = signatures.filter((sg) => isWrapName(sg.name_en));
+                    const addonWraps = addons.filter((a) => a.kind === "wrap");
+                    const sides = addons.filter((a) => a.kind === "side");
+
+                    const renderSig = (sg: Signature) => (
+                      <button
+                        key={`sig-${sg.id}`}
+                        className="picker-option"
+                        disabled={busy}
+                        onClick={() => handleAdd({
+                          dayIndex: openDay as 0|1|2|3|4|5|6,
+                          itemKind: "custom",
+                          customName: (lang === "vi" && sg.name_vn) ? sg.name_vn : displayName(sg.name_en),
+                          customKcal: sg.kcal,
+                          customProteinG: sg.protein_g,
+                          customFatG: sg.fat_g,
+                          customCarbsG: sg.carbs_g,
+                          customFibreG: sg.fibre_g,
+                        })}
+                      >
+                        <div className="ico" style={{ background: "#C0DD97", color: "#0F563D" }}>B</div>
+                        <div className="body">
+                          <div className="name">{(lang === "vi" && sg.name_vn) ? sg.name_vn : displayName(sg.name_en)}</div>
+                          <div className="macros">{sg.kcal} cal &middot; {sg.protein_g.toFixed(0)}g protein</div>
+                        </div>
+                      </button>
+                    );
+                    const renderAddon = (a: AddonMin, label: string, bg: string, fg: string) => (
+                      <button
+                        key={`${a.kind}-${a.id}`}
+                        className="picker-option"
+                        disabled={busy}
+                        onClick={() => handleAdd({ dayIndex: openDay as 0|1|2|3|4|5|6, itemKind: a.kind, addonId: a.id })}
+                      >
+                        <div className="ico" style={{ background: bg, color: fg }}>{label}</div>
+                        <div className="body">
+                          <div className="name">{(lang === "vi" && a.name_vn) ? a.name_vn : a.name_en}</div>
+                          <div className="macros">{Math.round(Number(a.kcal ?? 0))} cal &middot; {Number(a.protein_g ?? 0).toFixed(0)}g protein</div>
+                        </div>
+                      </button>
+                    );
+
+                    return (
+                      <>
+                        {sigBowls.length > 0 && (
+                          <>
+                            <div className="picker-subheading">{str.picker_sub_bowls}</div>
+                            {sigBowls.map(renderSig)}
+                          </>
+                        )}
+                        {(sigWraps.length > 0 || addonWraps.length > 0) && (
+                          <>
+                            <div className="picker-subheading">{str.picker_sub_wraps}</div>
+                            {sigWraps.map(renderSig)}
+                            {addonWraps.map((a) => renderAddon(a, "W", "#FFE9C2", "#7D291A"))}
+                          </>
+                        )}
+                        {sides.length > 0 && (
+                          <>
+                            <div className="picker-subheading">{str.picker_sub_sides}</div>
+                            {sides.map((a) => renderAddon(a, "S", "#F8E3F3", "#7D291A"))}
+                          </>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               )}
 
