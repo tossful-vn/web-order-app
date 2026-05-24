@@ -39,6 +39,7 @@ type Item = {
   notes?: string | null;
   in_menu: boolean;
   customizable?: boolean;
+  is_best_seller?: boolean | null;
   nutrition?: Nutrition | null;
 };
 
@@ -65,6 +66,7 @@ type SigBowl = {
   tagline: string | null;
   total_g: number | null;
   customizable: boolean;
+  isBestSeller: boolean;
   components: RecipeComponent[];
   /** Non-in_menu components — included if customer customizes this signature. */
   lockedComponents: LockedComponent[];
@@ -115,6 +117,18 @@ function computeBowlMacros(components: RecipeComponent[], items: Item[]) {
 
 function pickName(item: Item, lang: Lang) {
   return lang === "vi" && item.name_vn ? item.name_vn : item.name_en;
+}
+
+/**
+ * Display-time rename for signature variants.
+ * DB stores legacy convention "<X> - Wrap"; brand convention is "WRAP | <X>".
+ * Bowl signatures pass through unchanged. Photo lookup in photo-maps.ts
+ * recognises both conventions, so we never have to migrate the DB.
+ */
+function formatSigName(rawName: string): string {
+  const wrapMatch = rawName.match(/^(.+?)\s*-\s*Wrap\s*$/i);
+  if (wrapMatch) return `WRAP | ${wrapMatch[1].trim()}`;
+  return rawName;
 }
 
 function suggestBowlName(
@@ -194,7 +208,7 @@ export default function Calculator() {
         // BYO picker filters by in_menu downstream when building byoItems.
         const { data: rawItems, error: itemErr } = await supabase
           .from("items")
-          .select("id,name_en,name_vn,category,kind,tossful_portion_g,notes,in_menu,customizable")
+          .select("id,name_en,name_vn,category,kind,tossful_portion_g,notes,in_menu,customizable,is_best_seller")
           .eq("active", true)
           .in("category", ["Base", "Topping", "Premium", "Dressing", "Signature"])
           .order("category", { ascending: true })
@@ -261,10 +275,11 @@ export default function Calculator() {
             }
             return {
               id: s.id,
-              name: s.name_en,
+              name: formatSigName(s.name_en),
               tagline,
               total_g: s.tossful_portion_g,
               customizable: s.customizable !== false, // default true if undefined
+              isBestSeller: s.is_best_seller === true,
               components,
               lockedComponents,
               macros: computeBowlMacros(components, enriched),
@@ -686,6 +701,14 @@ export default function Calculator() {
                         <img src={`/nutrition/${photo}`} alt={b.name} loading="lazy" />
                       ) : (
                         <div className="ph">{b.name}</div>
+                      )}
+                      {b.isBestSeller && (
+                        <img
+                          className="best-seller-badge"
+                          src="/brand/bestseller-sticker.png"
+                          alt={lang === "vi" ? "Bán chạy" : "Best Seller"}
+                          aria-label={lang === "vi" ? "Bán chạy" : "Best Seller"}
+                        />
                       )}
                     </div>
                     <div className="body">

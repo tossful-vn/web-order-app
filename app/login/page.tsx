@@ -94,7 +94,14 @@ export default function LoginPage({
 
   return (
     <main className="min-h-screen flex items-center justify-center p-6">
-      <div className="w-full max-w-sm bg-white border border-kale-100 rounded-2xl p-8 shadow-sm">
+      <div className="w-full max-w-3xl flex flex-col sm:flex-row items-center justify-center gap-6 sm:gap-10">
+        <img
+          src="/brand/tossful-mascot.png"
+          alt=""
+          aria-hidden="true"
+          className="w-40 sm:w-[280px] h-auto shrink-0 select-none"
+        />
+        <div className="w-full max-w-sm bg-white border border-kale-100 rounded-2xl p-8 shadow-sm">
         <h1 className="font-display text-3xl text-kale-700 mb-2">{title}</h1>
         <p className="text-sm text-kale-600 mb-6">{subtitle}</p>
 
@@ -162,6 +169,7 @@ export default function LoginPage({
               <Link href="/login" className="text-kale-700 underline">{s.back_to_login}</Link>
             </div>
           )}
+        </div>
         </div>
       </div>
     </main>

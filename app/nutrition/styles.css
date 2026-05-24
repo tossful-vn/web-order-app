@@ -17,8 +17,12 @@
 .tossful-calc .tabs span.on { color: #0F563D; border-bottom-color: #0F563D; font-weight: 500; }
 .tossful-calc .sigs { padding: 14px 20px 0; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; max-width: 720px; margin: 0 auto; }
 .tossful-calc .sig-card { background: #fff; border-radius: 14px; padding: 0; border: 0.5px solid rgba(0,0,0,0.08); display: flex; flex-direction: column; overflow: hidden; }
-.tossful-calc .sig-card .photo { width: 100%; aspect-ratio: 1; background: #F4F1E6; overflow: hidden; display: flex; align-items: center; justify-content: center; }
-.tossful-calc .sig-card .photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tossful-calc .sig-card .photo { width: 100%; aspect-ratio: 1; background: #F4F1E6; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative; }
+.tossful-calc .sig-card .photo > img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tossful-calc .sig-card .best-seller-badge { position: absolute; top: 6px; right: 6px; width: 44px; height: auto; pointer-events: none; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.18)); z-index: 2; }
+@media (min-width: 480px) {
+  .tossful-calc .sig-card .best-seller-badge { width: 52px; }
+}
 .tossful-calc .sig-card .photo .ph { font-family: var(--font-questrial), 'Questrial', sans-serif; font-weight: 400; font-size: 22px; color: #0F563D; padding: 12px; text-align: center; }
 .tossful-calc .sig-card .body { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
 .tossful-calc .sig-card h4 { font-family: var(--font-questrial), 'Questrial', sans-serif; font-style: normal; font-weight: 400; font-size: 17px; color: #0F563D; margin: 0; line-height: 1.2; }

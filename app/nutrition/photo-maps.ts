@@ -35,8 +35,9 @@ export function lookupSignaturePhoto(name: string): string | undefined {
   if (SIG_PHOTO_MAP[name]) return SIG_PHOTO_MAP[name];
   const ascii = stripDiacritics(name);
   if (SIG_PHOTO_MAP[ascii]) return SIG_PHOTO_MAP[ascii];
-  // 2. Wrap variants ("<X> - Wrap") -> shared wrap flatlay
-  if (/\s*-\s*Wrap\s*$/i.test(name)) {
+  // 2. Wrap variants -> shared wrap flatlay.
+  //    Recognises both legacy "<X> - Wrap" and new "WRAP | <X>" conventions.
+  if (/\s*-\s*Wrap\s*$/i.test(name) || /^\s*WRAP\s*\|\s*/i.test(name)) {
     return "signature_wrap.png";
   }
   return undefined;

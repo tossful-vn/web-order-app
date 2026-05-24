@@ -71,7 +71,13 @@ export default async function AccountPage() {
       </section>
 
       {list.length === 0 ? (
-        <div className="border border-dashed border-kale-200 rounded-2xl p-10 text-center">
+        <div className="border border-dashed border-kale-200 rounded-2xl p-10 text-center flex flex-col items-center">
+          <img
+            src="/brand/tossful-mascot.png"
+            alt=""
+            aria-hidden="true"
+            className="w-[200px] h-auto mb-4 select-none"
+          />
           <p className="text-kale-700 font-medium mb-1">{s.empty_h}</p>
           <p className="text-sm text-kale-500 mb-5">{s.empty_p}</p>
           <Link

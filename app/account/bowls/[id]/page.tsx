@@ -34,7 +34,7 @@ const STRINGS = {
     delete_cta: "Xóa vĩnh viễn",
     panel_label: "% mục tiêu hôm nay",
     macro_labels: { cal: "CAL", protein: "ĐẠM", fat: "BÉO", carbs: "T.BỘT", fiber: "C.XƠ" },
-    sections: { base: "Base", topping: "Topping", premium: "Premium", dressing: "Dressing", free: "Free" },
+    sections: { base: "Cơ bản", topping: "Topping", premium: "Premium", dressing: "Sốt", free: "Khác" },
     included: "Đã bao gồm",
   },
 } as const;
