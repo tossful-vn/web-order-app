@@ -116,9 +116,9 @@ export default async function AccountPage() {
               <li key={b.id} className="relative">
                 <Link
                   href={`/account/bowls/${b.id}`}
-                  className="block border border-kale-100 rounded-xl p-4 pr-12 hover:border-kale-300 hover:shadow-sm transition h-full"
+                  className="block border border-kale-100 rounded-xl p-4 hover:border-kale-300 hover:shadow-sm transition h-full"
                 >
-                  <div className="font-medium text-kale-700 mb-3 line-clamp-1">
+                  <div className="font-medium text-kale-700 mb-3 line-clamp-1 pr-12">
                     {b.name}
                   </div>
                   <MacroPanel
