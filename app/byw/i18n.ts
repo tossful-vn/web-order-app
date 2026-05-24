@@ -11,7 +11,7 @@ const VI_picker_close = "Đóng";
 const VI_picker_my_bowls = "Bowl của tôi";
 const VI_picker_drinks = "Đồ uống";
 const VI_picker_foods = "Món thêm";
-const VI_picker_tossful = "Tossful Signature";
+const VI_picker_tossful = "Signature";
 const VI_picker_custom = "Tự nhập";
 const VI_picker_no_bowls = "Bạn chưa lưu bowl nào. Hãy tạo một bowl trong máy tính trước.";
 const VI_picker_open_calc = "Mở máy tính";
@@ -52,7 +52,7 @@ export const BYW_STR = {
     picker_my_bowls: "My bowls",
     picker_drinks: "Drinks",
     picker_foods: "Foods",
-    picker_tossful: "Tossful Signature",
+    picker_tossful: "Signature",
     picker_custom: "Custom",
     picker_no_bowls: "No saved bowls yet. Build one in the calculator first.",
     picker_open_calc: "Open calculator",
