@@ -703,12 +703,19 @@ export default function Calculator() {
                         <div className="ph">{b.name}</div>
                       )}
                       {b.isBestSeller && (
-                        <img
+                        <svg
                           className="best-seller-badge"
-                          src="/brand/bestseller-sticker.png"
-                          alt={lang === "vi" ? "Bán chạy" : "Best Seller"}
+                          viewBox="0 0 24 32"
+                          xmlns="http://www.w3.org/2000/svg"
+                          role="img"
                           aria-label={lang === "vi" ? "Bán chạy" : "Best Seller"}
-                        />
+                        >
+                          <title>{lang === "vi" ? "Bán chạy" : "Best Seller"}</title>
+                          <path
+                            fill="#F68C02"
+                            d="M12 1 C 13 6, 17 9, 18 13 C 19 14, 19 15, 18.5 15.5 C 17.5 14.5, 16 14, 15 14.5 C 16 16, 17 18, 17 20 C 17 22, 16 23, 14.5 23 C 13.5 23, 13 22, 13 21 C 13 22.5, 12 23, 11 23 C 9 23, 7 21, 7 18 C 7 16, 7.5 14.5, 8 13.5 C 8 16, 9 17, 10 17 C 10 13, 11 9, 12 1 Z"
+                          />
+                        </svg>
                       )}
                     </div>
                     <div className="body">
