@@ -7,55 +7,64 @@ import "./byw.css";
 export const metadata = { title: "Tuan cua toi - Tossful" };
 
 export default async function BywPage() {
-  const user = await requireUser();
+  // Batch 1 — auth + draft-week setup in parallel (both independent).
   const supabase = createClient();
-
-  const weekRes = await ensureDraftWeek();
+  const [user, weekRes] = await Promise.all([
+    requireUser(),
+    ensureDraftWeek(),
+  ]);
   if ("error" in weekRes) {
     throw new Error(weekRes.error);
   }
   const weekId = weekRes.id;
 
-  // Fetch joined week_items
-  const { data: rawItems, error: itemsErr } = await supabase
-    .from("week_items")
-    .select(
-      `id, week_id, user_id, day_index, item_kind, bowl_id, addon_id,
-       custom_name, custom_kcal, custom_protein_g, custom_fat_g, custom_carbs_g, custom_fibre_g,
-       sort_order,
-       bowl:saved_bowls(id, name, kcal, protein_g, fat_g, carbs_g, fibre_g),
-       addon:addons(id, kind, name_en, name_vn, kcal, protein_g, fat_g, carbs_g, fibre_g)`,
-    )
-    .eq("week_id", weekId)
-    .order("day_index", { ascending: true })
-    .order("sort_order", { ascending: true });
+  // Batch 2 — fire all four independent queries in parallel.
+  // Previously sequential (~4 × Supabase round-trip = 1.2-2s on cold path).
+  // Now bounded by the slowest single query (~300-500ms).
+  const [
+    weekItemsRes,
+    savedBowlsRes,
+    addonsRes,
+    sigItemsRes,
+  ] = await Promise.all([
+    supabase
+      .from("week_items")
+      .select(
+        `id, week_id, user_id, day_index, item_kind, bowl_id, addon_id,
+         custom_name, custom_kcal, custom_protein_g, custom_fat_g, custom_carbs_g, custom_fibre_g,
+         sort_order,
+         bowl:saved_bowls(id, name, kcal, protein_g, fat_g, carbs_g, fibre_g),
+         addon:addons(id, kind, name_en, name_vn, kcal, protein_g, fat_g, carbs_g, fibre_g)`,
+      )
+      .eq("week_id", weekId)
+      .order("day_index", { ascending: true })
+      .order("sort_order", { ascending: true }),
+    supabase
+      .from("saved_bowls")
+      .select("id, name, kcal, protein_g, fat_g, carbs_g, fibre_g, is_favourite")
+      .eq("user_id", user.id)
+      .order("is_favourite", { ascending: false })
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("addons")
+      .select("id, kind, name_en, name_vn, kcal, protein_g, fat_g, carbs_g, fibre_g")
+      .eq("active", true)
+      .eq("in_menu", true)
+      .order("sort_order", { ascending: true }),
+    supabase
+      .from("items")
+      .select("id, name_en, name_vn, notes")
+      .eq("in_menu", true)
+      .eq("active", true)
+      .eq("category", "Signature")
+      .order("name_en", { ascending: true }),
+  ]);
+
+  const { data: rawItems, error: itemsErr } = weekItemsRes;
   if (itemsErr) throw new Error(itemsErr.message);
-
-  // Saved bowls — include is_favourite so Planner can surface a Must Try section
-  const { data: savedBowls } = await supabase
-    .from("saved_bowls")
-    .select("id, name, kcal, protein_g, fat_g, carbs_g, fibre_g, is_favourite")
-    .eq("user_id", user.id)
-    .order("is_favourite", { ascending: false })
-    .order("created_at", { ascending: false });
-
-  // Addons (drinks, wraps, sides — splits client-side by kind)
-  const { data: addons } = await supabase
-    .from("addons")
-    .select("id, kind, name_en, name_vn, kcal, protein_g, fat_g, carbs_g, fibre_g")
-    .eq("active", true)
-    .eq("in_menu", true)
-    .order("sort_order", { ascending: true });
-
-  // Signatures — fetched from items (category='Signature') + recipe_components + item_nutrition.
-  // Compute macros server-side and pass as a pre-priced "tossful bowl" option for the picker.
-  const { data: sigItems } = await supabase
-    .from("items")
-    .select("id, name_en, name_vn, notes")
-    .eq("in_menu", true)
-    .eq("active", true)
-    .eq("category", "Signature")
-    .order("name_en", { ascending: true });
+  const { data: savedBowls } = savedBowlsRes;
+  const { data: addons } = addonsRes;
+  const { data: sigItems } = sigItemsRes;
 
   type Signature = {
     id: string; name_en: string; name_vn: string | null;
