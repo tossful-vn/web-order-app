@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getServerLang } from "@/lib/lang-server";
+import { toggleFavourite } from "@/lib/bowls/actions";
 import MacroPanel from "@/lib/components/MacroPanel";
 import GuestBowlClaim from "./guest-bowl-claim";
 
@@ -15,6 +16,8 @@ const STRINGS = {
     panel_label: "% of daily target",
     macro_labels: { cal: "CAL", protein: "PROTEIN", fat: "FAT", carbs: "CARBS", fiber: "FIBER" },
     metadata_title: "Your bowls · Tossful",
+    must_try_add: "Mark as Must Try",
+    must_try_remove: "Remove from Must Try",
   },
   vi: {
     title: "Bowl của bạn",
@@ -26,6 +29,8 @@ const STRINGS = {
     panel_label: "% mục tiêu hôm nay",
     macro_labels: { cal: "CAL", protein: "ĐẠM", fat: "BÉO", carbs: "T.BỘT", fiber: "C.XƠ" },
     metadata_title: "Bowl của bạn · Tossful",
+    must_try_add: "Đánh dấu Phải thử",
+    must_try_remove: "Bỏ khỏi Phải thử",
   },
 } as const;
 
@@ -42,6 +47,7 @@ type BowlRow = {
   fat_g: number | null;
   carbs_g: number | null;
   fibre_g: number | null;
+  is_favourite: boolean | null;
   created_at: string;
 };
 
@@ -49,9 +55,11 @@ export default async function AccountPage() {
   const lang = getServerLang();
   const s = STRINGS[lang];
   const supabase = createClient();
+  // Favourites first, then newest. is_favourite desc puts true (1) before false (0).
   const { data: bowls } = await supabase
     .from("saved_bowls")
-    .select("id, name, kcal, protein_g, fat_g, carbs_g, fibre_g, created_at")
+    .select("id, name, kcal, protein_g, fat_g, carbs_g, fibre_g, is_favourite, created_at")
+    .order("is_favourite", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(40);
 
@@ -97,11 +105,12 @@ export default async function AccountPage() {
               carbs: Number(b.carbs_g ?? 0),
               fibre: Number(b.fibre_g ?? 0),
             };
+            const isFav = b.is_favourite === true;
             return (
-              <li key={b.id}>
+              <li key={b.id} className="relative">
                 <Link
                   href={`/account/bowls/${b.id}`}
-                  className="block border border-kale-100 rounded-xl p-4 hover:border-kale-300 hover:shadow-sm transition h-full"
+                  className="block border border-kale-100 rounded-xl p-4 pr-12 hover:border-kale-300 hover:shadow-sm transition h-full"
                 >
                   <div className="font-medium text-kale-700 mb-3 line-clamp-1">
                     {b.name}
@@ -115,6 +124,34 @@ export default async function AccountPage() {
                     {new Date(b.created_at).toLocaleDateString(dateLocale)}
                   </div>
                 </Link>
+                {/* Heart toggle — absolute positioned over the link, higher z-index */}
+                <form
+                  action={toggleFavourite}
+                  className="absolute top-3 right-3 z-10"
+                >
+                  <input type="hidden" name="id" value={b.id} />
+                  <button
+                    type="submit"
+                    aria-label={isFav ? s.must_try_remove : s.must_try_add}
+                    title={isFav ? s.must_try_remove : s.must_try_add}
+                    className="flex items-center justify-center w-9 h-9 rounded-full bg-white border border-kale-100 hover:bg-kale-50 hover:border-kale-300 transition"
+                  >
+                    {/* Heart SVG — filled brand-orange when favourited, outlined kale otherwise */}
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="18"
+                      height="18"
+                      fill={isFav ? "#F68C02" : "none"}
+                      stroke={isFav ? "#F68C02" : "#3a5634"}
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                    </svg>
+                  </button>
+                </form>
               </li>
             );
           })}

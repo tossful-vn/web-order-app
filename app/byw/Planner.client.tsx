@@ -15,7 +15,7 @@ type Macros = {
   carbs_g: number | null;
   fibre_g: number | null;
 };
-type BowlMin = { id: string; name: string } & Macros;
+type BowlMin = { id: string; name: string; is_favourite?: boolean | null } & Macros;
 type AddonMin = {
   id: string;
   kind: "drink" | "food" | "wrap" | "side";
@@ -162,11 +162,59 @@ export default function Planner({ weekId: _weekId, items, savedBowls, addons, si
 
   const macroLabels = { cal: str.macro_cal, protein: str.macro_protein, fat: str.macro_fat, carbs: str.macro_carbs, fiber: str.macro_fiber };
 
+  // Must Try — favourited saved bowls, surfaced at the top
+  const mustTryBowls = savedBowls.filter((b) => b.is_favourite === true);
+
   return (
     <div className="byw-page">
       <div className="byw-app">
         <h1 className="byw-hero-h1">{str.page_title}</h1>
         <p className="byw-hero-p">{str.page_sub}</p>
+
+        {/* Must Try — favourited saved bowls */}
+        <section className="must-try-section">
+          <div className="must-try-head">
+            <h2 className="must-try-h2">
+              <span className="must-try-heart" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="#F68C02" stroke="#F68C02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                </svg>
+              </span>
+              {str.must_try}
+              {mustTryBowls.length > 0 && (
+                <span className="must-try-count">{mustTryBowls.length}</span>
+              )}
+            </h2>
+          </div>
+          {mustTryBowls.length === 0 ? (
+            <div className="must-try-empty">
+              <p>{str.must_try_empty}</p>
+              <Link href="/account" className="must-try-empty-cta">
+                {str.must_try_open} →
+              </Link>
+            </div>
+          ) : (
+            <div className="must-try-row">
+              {mustTryBowls.map((b) => (
+                <Link
+                  key={b.id}
+                  href={`/account/bowls/${b.id}`}
+                  className="must-try-card"
+                >
+                  <div className="must-try-card-name">{b.name}</div>
+                  <div className="must-try-card-macros">
+                    <span className="m">
+                      <strong>{Math.round(Number(b.kcal ?? 0))}</strong> {str.macro_cal.toLowerCase()}
+                    </span>
+                    <span className="m">
+                      <strong>{Math.round(Number(b.protein_g ?? 0))}g</strong> {str.macro_protein.toLowerCase()}
+                    </span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </section>
 
         {[0, 1, 2, 3, 4, 5, 6].map((d) => {
           const dayItems = itemsByDay[d];

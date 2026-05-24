@@ -29,6 +29,9 @@ const VI_days = ["Thứ hai","Thứ ba","Thứ tư","Thứ năm","Thứ sáu","T
 const VI_days_short = ["T2","T3","T4","T5","T6","T7","CN"];
 const VI_item_count = (n: number) => n === 1 ? "1 món" : `${n} món`;
 const VI_signin_first = "Đăng nhập để lên kế hoạch tuần.";
+const VI_must_try = "Phải thử";
+const VI_must_try_empty = "Chưa có món nào. Mở Bowl của bạn rồi bấm hình trái tim để đánh dấu Phải thử.";
+const VI_must_try_open = "Mở Bowl của tôi";
 
 const EN_days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
 const EN_days_short = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
@@ -63,6 +66,9 @@ export const BYW_STR = {
     days_short: EN_days_short,
     item_count: (n: number) => n === 1 ? "1 item" : `${n} items`,
     signin_first: "Sign in to plan your week.",
+    must_try: "Must Try",
+    must_try_empty: "Nothing here yet. Open Your Bowls and tap the heart to mark a bowl as Must Try.",
+    must_try_open: "Open My Bowls",
     macro_cal: "CAL", macro_protein: "PROTEIN", macro_fat: "FAT", macro_carbs: "CARBS", macro_fiber: "FIBER",
   },
   vi: {
@@ -94,6 +100,9 @@ export const BYW_STR = {
     days_short: VI_days_short,
     item_count: VI_item_count,
     signin_first: VI_signin_first,
+    must_try: VI_must_try,
+    must_try_empty: VI_must_try_empty,
+    must_try_open: VI_must_try_open,
     macro_cal: "CAL",
     macro_protein: "ĐẠM",
     macro_fat: "BÉO",

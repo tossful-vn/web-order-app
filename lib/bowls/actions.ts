@@ -108,3 +108,28 @@ export async function deleteBowl(formData: FormData): Promise<void> {
   revalidatePath("/account");
   redirect("/account");
 }
+/** Form action — toggles is_favourite on a saved bowl. Void return, throws on error. */
+export async function toggleFavourite(formData: FormData): Promise<void> {
+  const id = String(formData.get("id") ?? "");
+  if (!id) throw new Error("Missing id");
+
+  const supabase = createClient();
+  // Atomic toggle: read current → write inverse.
+  const { data: row, error: readErr } = await supabase
+    .from("saved_bowls")
+    .select("is_favourite")
+    .eq("id", id)
+    .maybeSingle();
+  if (readErr) throw new Error(readErr.message);
+  if (!row) throw new Error("Bowl not found");
+
+  const { error: writeErr } = await supabase
+    .from("saved_bowls")
+    .update({ is_favourite: !row.is_favourite })
+    .eq("id", id);
+  if (writeErr) throw new Error(writeErr.message);
+
+  revalidatePath("/account");
+  revalidatePath("/byw");
+}
+

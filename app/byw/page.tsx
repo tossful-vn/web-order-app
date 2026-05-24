@@ -31,11 +31,12 @@ export default async function BywPage() {
     .order("sort_order", { ascending: true });
   if (itemsErr) throw new Error(itemsErr.message);
 
-  // Saved bowls
+  // Saved bowls — include is_favourite so Planner can surface a Must Try section
   const { data: savedBowls } = await supabase
     .from("saved_bowls")
-    .select("id, name, kcal, protein_g, fat_g, carbs_g, fibre_g")
+    .select("id, name, kcal, protein_g, fat_g, carbs_g, fibre_g, is_favourite")
     .eq("user_id", user.id)
+    .order("is_favourite", { ascending: false })
     .order("created_at", { ascending: false });
 
   // Addons (drinks, wraps, sides — splits client-side by kind)
