@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useLang } from "@/lib/lang";
 import { BYW_STR } from "./i18n";
@@ -99,6 +99,10 @@ export default function Planner({ weekId: _weekId, items, savedBowls, addons, si
   const [pickerTab, setPickerTab] = useState<"bowl" | "tossful" | "drink" | "custom">("bowl");
   const [pickerErr, setPickerErr] = useState<string | null>(null);
   const [busy, startTransition] = useTransition();
+  // Optimistic add: when user picks an item, we insert it locally immediately
+  // and clear when the server-refreshed `items` prop comes back in.
+  const [optimisticItems, setOptimisticItems] = useState<WeekItemRow[]>([]);
+  useEffect(() => { setOptimisticItems([]); }, [items]);
 
   const [cName, setCName] = useState("");
   const [cKcal, setCKcal] = useState("");
@@ -109,12 +113,12 @@ export default function Planner({ weekId: _weekId, items, savedBowls, addons, si
 
   const itemsByDay = useMemo(() => {
     const map: WeekItemRow[][] = [[], [], [], [], [], [], []];
-    for (const item of items) {
+    for (const item of [...items, ...optimisticItems]) {
       const idx = Math.max(0, Math.min(6, item.day_index));
       map[idx].push(item);
     }
     return map;
-  }, [items]);
+  }, [items, optimisticItems]);
 
   const dayTotals = useMemo(() => {
     return itemsByDay.map((dayItems) => {
@@ -136,10 +140,53 @@ export default function Planner({ weekId: _weekId, items, savedBowls, addons, si
 
   function handleAdd(args: Parameters<typeof addWeekItem>[0]) {
     setPickerErr(null);
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const baseRow = {
+      id: tempId, week_id: "", user_id: "",
+      day_index: args.dayIndex,
+      bowl_id: null as string | null, addon_id: null as string | null,
+      custom_name: null as string | null,
+      custom_kcal: null as number | null, custom_protein_g: null as number | null,
+      custom_fat_g: null as number | null, custom_carbs_g: null as number | null,
+      custom_fibre_g: null as number | null,
+      sort_order: 9999,
+      bowl: null as BowlMin | null, addon: null as AddonMin | null,
+    };
+    let optimisticRow: WeekItemRow | null = null;
+    if (args.itemKind === "bowl" && args.bowlId) {
+      const b = savedBowls.find((x) => x.id === args.bowlId);
+      if (b) optimisticRow = { ...baseRow, item_kind: "bowl", bowl_id: b.id, bowl: b };
+    } else if (
+      (args.itemKind === "drink" || args.itemKind === "wrap" ||
+       args.itemKind === "side" || args.itemKind === "food") && args.addonId
+    ) {
+      const a = addons.find((x) => x.id === args.addonId);
+      if (a) optimisticRow = { ...baseRow, item_kind: args.itemKind, addon_id: a.id, addon: a };
+    } else if (args.itemKind === "custom") {
+      optimisticRow = {
+        ...baseRow, item_kind: "custom",
+        custom_name: args.customName ?? "",
+        custom_kcal: args.customKcal ?? null,
+        custom_protein_g: args.customProteinG ?? null,
+        custom_fat_g: args.customFatG ?? null,
+        custom_carbs_g: args.customCarbsG ?? null,
+        custom_fibre_g: args.customFibreG ?? null,
+      };
+    }
+    if (optimisticRow) {
+      setOptimisticItems((prev) => [...prev, optimisticRow!]);
+      closePicker();
+    }
     startTransition(async () => {
       const res = await addWeekItem(args);
-      if ("error" in res) { setPickerErr(res.error); return; }
-      closePicker();
+      if ("error" in res) {
+        // Revert + reopen picker with the error so the user can retry.
+        setOptimisticItems((prev) => prev.filter((r) => r.id !== tempId));
+        setPickerErr(res.error);
+        setOpenDay(args.dayIndex);
+        return;
+      }
+      // useEffect on [items] clears the temp row when the refresh lands.
       router.refresh();
     });
   }
@@ -199,10 +246,14 @@ export default function Planner({ weekId: _weekId, items, savedBowls, addons, si
                         <div className="ico">{iconOf(it.item_kind)}</div>
                         <span className="name">{nameOf(it, lang)}</span>
                         <span className="cal">{Math.round(m.cal)}</span>
-                        <form action={removeWeekItem}>
-                          <input type="hidden" name="id" value={it.id} />
-                          <button type="submit" className="x-btn" aria-label={str.remove}>&times;</button>
-                        </form>
+                        {it.id.startsWith("temp-") ? (
+                          <button type="button" className="x-btn" disabled style={{ opacity: 0.4 }} aria-label={str.remove}>&times;</button>
+                        ) : (
+                          <form action={removeWeekItem}>
+                            <input type="hidden" name="id" value={it.id} />
+                            <button type="submit" className="x-btn" aria-label={str.remove}>&times;</button>
+                          </form>
+                        )}
                       </div>
                     );
                   })}

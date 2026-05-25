@@ -91,6 +91,7 @@ export default function AppShell({ user, children }: Props) {
         <div className="px-3 py-2.5 flex items-center gap-2 max-w-5xl mx-auto">
           <Link
             href="/"
+            prefetch
             className="font-display italic text-kale-700 text-xl shrink-0 leading-none"
             style={{ letterSpacing: "-0.2px" }}
           >
@@ -102,6 +103,7 @@ export default function AppShell({ user, children }: Props) {
               <Link
                 key={l.href}
                 href={l.href}
+                prefetch
                 className={
                   "text-xs whitespace-nowrap py-1.5 border-b-2 transition-colors " +
                   (l.active
