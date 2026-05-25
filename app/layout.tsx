@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Fraunces, Questrial, Lora } from "next/font/google";
 import "./globals.css";
+import { Analytics } from "@vercel/analytics/next";
 
 const fraunces = Fraunces({
   subsets: ["latin", "latin-ext", "vietnamese"],
@@ -42,7 +43,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="vi" className={`${fraunces.variable} ${questrial.variable} ${lora.variable}`}>
-      <body className="font-body bg-cream text-ink antialiased">{children}</body>
+      <body className="font-body bg-cream text-ink antialiased">
+        {children}
+        <Analytics />
+      </body>
     </html>
   );
 }
