@@ -918,7 +918,11 @@ export default function Calculator() {
         {view === "edit" && (
           <>
             <div className="name-row">
+              <label className="name-label" htmlFor="bowl-name-input">
+                {str.bowl_name_label}
+              </label>
               <input
+                id="bowl-name-input"
                 className="name-input"
                 type="text"
                 maxLength={60}

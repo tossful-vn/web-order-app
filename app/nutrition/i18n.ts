@@ -14,6 +14,7 @@ export type StringTable = {
   your_bowl: string; empty_summary: string;
   reset: string; save_bowl: string;
   microcopy: string; save_soon: string;
+  bowl_name_label: string;
   bowl_name_placeholder: string;
   bowl_name_hint: string;
   saving: string;
@@ -66,13 +67,14 @@ const EN: StringTable = {
   reset: "Reset", save_bowl: "Save bowl",
   microcopy: "All values per serving",
   save_soon: "Save coming soon",
+  bowl_name_label: "Bowl name",
   bowl_name_placeholder: "Bowl name",
   bowl_name_hint: "Auto-named from your ingredients — tap to edit",
   saving: "Saving...",
   signature_modified_suffix: "(custom)",
   choose_q: "How would you like to start?",
   start_sig: "Start from a signature",
-  start_sig_desc: "Browse 7 Tossful recipes, then customise",
+  start_sig_desc: "Browse Tossful recipes, then customise",
   start_byo: "Build from scratch",
   start_byo_desc: "Pick ingredients one at a time",
   back_to_start: "Back to start",
@@ -132,6 +134,7 @@ const VI_reset = "Làm lại";
 const VI_save_bowl = "Lưu tô";
 const VI_microcopy = "Dinh dưỡng theo khẩu phần";
 const VI_save_soon = "Sap co chuc nang luu";
+const VI_bowl_name_label = "Tên bowl";
 const VI_bowl_name_placeholder = "Tên bowl";
 const VI_bowl_name_hint = "Tu dat ten tu nguyen lieu — cham de sua";
 const VI_saving = "Dang luu...";
@@ -187,7 +190,7 @@ const VI_source_label = "Nguồn";
 const VI_empty_alert = "Chưa có gì trong tô — chọn vài nguyên liệu nhé.";
 const VI_choose_q = "Bạn muốn bắt đầu thế nào?";
 const VI_start_sig = "Bắt đầu với tô signature";
-const VI_start_sig_desc = "Xem 7 công thức Tossful rồi tùy chỉnh";
+const VI_start_sig_desc = "Xem công thức Tossful rồi tùy chỉnh";
 const VI_start_byo = "Tự tạo từ đầu";
 const VI_start_byo_desc = "Chọn từng nguyên liệu";
 const VI_back_to_start = "Quay lại";
@@ -206,6 +209,7 @@ const VI: StringTable = {
   your_bowl: VI_your_bowl, empty_summary: VI_empty_summary,
   reset: VI_reset, save_bowl: VI_save_bowl,
   microcopy: VI_microcopy, save_soon: VI_save_soon,
+  bowl_name_label: VI_bowl_name_label,
   bowl_name_placeholder: VI_bowl_name_placeholder,
   bowl_name_hint: VI_bowl_name_hint,
   saving: VI_saving,

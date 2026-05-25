@@ -94,6 +94,7 @@
 .tossful-calc .chip.on .chip-name { color: #7D291A; font-weight: 500; }
 .tossful-calc .chip.on-kale .chip-name { color: #0F563D; font-weight: 500; }
 .tossful-calc .name-row { padding: 14px 20px 0; }
+.tossful-calc .name-label { display: block; font-size: 12px; font-weight: 600; color: #0F563D; margin-bottom: 6px; padding-left: 4px; letter-spacing: 0.02em; text-transform: uppercase; }
 .tossful-calc .name-input { width: 100%; padding: 10px 14px; border-radius: 999px; border: 0.5px solid rgba(0,0,0,0.15); font-family: inherit; font-size: 13px; background: #fff; color: #1a1a1a; box-sizing: border-box; }
 .tossful-calc .name-input:focus { outline: none; border-color: #0F563D; }
 .tossful-calc .name-input::placeholder { color: #aaa; }
