@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getServerLang } from "@/lib/lang-server";
-import { toggleFavourite } from "@/lib/bowls/actions";
+import HeartToggle from "./HeartToggle.client";
 import MacroPanel from "@/lib/components/MacroPanel";
 import GuestBowlClaim from "./guest-bowl-claim";
 
@@ -130,32 +130,14 @@ export default async function AccountPage() {
                     {new Date(b.created_at).toLocaleDateString(dateLocale)}
                   </div>
                 </Link>
-                <form
-                  action={toggleFavourite}
-                  className="absolute top-3 right-3 z-10"
-                >
-                  <input type="hidden" name="id" value={b.id} />
-                  <button
-                    type="submit"
-                    aria-label={isFav ? s.must_try_remove : s.must_try_add}
-                    title={isFav ? s.must_try_remove : s.must_try_add}
-                    className="flex items-center justify-center w-9 h-9 rounded-full bg-white border border-kale-100 hover:bg-kale-50 hover:border-kale-300 transition"
-                  >
-                    <svg
-                      viewBox="0 0 24 24"
-                      width="18"
-                      height="18"
-                      fill={isFav ? "#F68C02" : "none"}
-                      stroke={isFav ? "#F68C02" : "#3a5634"}
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                    >
-                      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-                    </svg>
-                  </button>
-                </form>
+                <div className="absolute top-3 right-3 z-10">
+                  <HeartToggle
+                    id={b.id}
+                    initialIsFavourite={isFav}
+                    addLabel={s.must_try_add}
+                    removeLabel={s.must_try_remove}
+                  />
+                </div>
               </li>
             );
           };

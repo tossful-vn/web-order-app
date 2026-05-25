@@ -108,10 +108,22 @@ export async function deleteBowl(formData: FormData): Promise<void> {
   revalidatePath("/account");
   redirect("/account");
 }
-/** Form action — toggles is_favourite on a saved bowl. Void return, throws on error. */
+
+/** Form action — toggles is_favourite on a saved bowl. Void return, throws on error.
+ * Kept for backwards compat with progressive-enhancement <form> usage. */
 export async function toggleFavourite(formData: FormData): Promise<void> {
   const id = String(formData.get("id") ?? "");
   if (!id) throw new Error("Missing id");
+  const res = await toggleFavouriteById(id);
+  if ("error" in res) throw new Error(res.error);
+}
+
+/** Client-callable variant — takes id directly, returns result object instead of throwing.
+ * Used by HeartToggle.client.tsx for optimistic UI on /account. */
+export async function toggleFavouriteById(
+  id: string
+): Promise<{ ok: true; isFavourite: boolean } | { error: string }> {
+  if (!id) return { error: "Missing id" };
 
   const supabase = createClient();
   // Atomic toggle: read current → write inverse.
@@ -120,16 +132,17 @@ export async function toggleFavourite(formData: FormData): Promise<void> {
     .select("is_favourite")
     .eq("id", id)
     .maybeSingle();
-  if (readErr) throw new Error(readErr.message);
-  if (!row) throw new Error("Bowl not found");
+  if (readErr) return { error: readErr.message };
+  if (!row) return { error: "Bowl not found" };
 
+  const next = !row.is_favourite;
   const { error: writeErr } = await supabase
     .from("saved_bowls")
-    .update({ is_favourite: !row.is_favourite })
+    .update({ is_favourite: next })
     .eq("id", id);
-  if (writeErr) throw new Error(writeErr.message);
+  if (writeErr) return { error: writeErr.message };
 
   revalidatePath("/account");
   revalidatePath("/byw");
+  return { ok: true, isFavourite: next };
 }
-
