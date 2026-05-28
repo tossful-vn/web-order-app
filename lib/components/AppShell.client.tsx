@@ -6,6 +6,7 @@ const VI = {
   nav_calc: "Dinh dưỡng",
   nav_week: "Tuần của tôi",
   nav_bowls: "Bowl đã lưu",
+  nav_loyalty: "Loyalty",
   menu_label: "Menu",
   drawer_guest: "Khách",
   drawer_guest_sub: "Đăng nhập hoặc tạo tài khoản để lưu bowl",
@@ -26,6 +27,7 @@ const EN = {
   nav_calc: "Calculator",
   nav_week: "My week",
   nav_bowls: "Saved bowls",
+  nav_loyalty: "Loyalty",
   menu_label: "Menu",
   drawer_guest: "Guest",
   drawer_guest_sub: "Sign in or create an account to save bowls",
@@ -62,6 +64,7 @@ export default function AppShell({ user, children }: Props) {
   const isCalc = pathname.startsWith("/nutrition");
   const isWeek = pathname.startsWith("/byw");
   const isBowls = pathname.startsWith("/account");
+  const isLoyalty = pathname.startsWith("/loyalty");
 
   // Close drawer when route changes
   useEffect(() => { setOpen(false); }, [pathname]);
@@ -77,6 +80,7 @@ export default function AppShell({ user, children }: Props) {
     { href: "/nutrition", label: str.nav_calc, active: isCalc },
     { href: "/byw", label: str.nav_week, active: isWeek },
     { href: "/account", label: str.nav_bowls, active: isBowls },
+    { href: "/loyalty", label: str.nav_loyalty, active: isLoyalty },
   ];
 
   return (

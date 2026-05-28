@@ -4,8 +4,6 @@ import { getServerLang } from "@/lib/lang-server";
 import HeartToggle from "./HeartToggle.client";
 import MacroPanel from "@/lib/components/MacroPanel";
 import GuestBowlClaim from "./guest-bowl-claim";
-import StampCard from "./StampCard.client";
-import { getActiveStampCard } from "@/lib/loyalty";
 
 const STRINGS = {
   en: {
@@ -69,22 +67,12 @@ export default async function AccountPage() {
     .order("created_at", { ascending: false })
     .limit(40);
 
-  // Loyalty stamp card data
-  const stampData = await getActiveStampCard();
-
   const list = (bowls ?? []) as BowlRow[];
   const dateLocale = lang === "vi" ? "vi-VN" : "en-GB";
 
   return (
     <div className="space-y-8 p-6 max-w-5xl mx-auto w-full">
       <GuestBowlClaim />
-
-      {/* Loyalty stamp card */}
-      <StampCard
-        card={stampData?.card ?? null}
-        entries={stampData?.entries ?? []}
-        lang={lang}
-      />
 
       <section>
         <h1 className="font-display text-4xl text-kale-700 mb-2">{s.title}</h1>
