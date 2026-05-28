@@ -41,15 +41,17 @@ const STRINGS = {
 } as const;
 
 /* ── Arc slot positions (in a 260x180 container) ── */
+// ∪ bowl shape — 400×260 container, 8 slots on a 160px-radius arc.
+// Center of imaginary circle: (200, 40). Sweep from 200° to 340° through bottom of bowl.
 const ARC_SLOTS: { left: number; top: number }[] = [
-  { left: 22, top: 90 },   // slot 1 (200°)
-  { left: 44, top: 52 },   // slot 2 (220°)
-  { left: 72, top: 26 },   // slot 3 (240°)
-  { left: 109, top: 14 },  // slot 4 (260°)
-  { left: 145, top: 14 },  // slot 5 (280°)
-  { left: 182, top: 26 },  // slot 6 (300°)
-  { left: 212, top: 52 },  // slot 7 (320°)
-  { left: 232, top: 90 },  // slot 8 (340°)
+  { left: 50,  top: 94  },  // slot 1 (top-left rim)
+  { left: 77,  top: 143 },  // slot 2
+  { left: 120, top: 179 },  // slot 3
+  { left: 172, top: 198 },  // slot 4 (bottom-left)
+  { left: 228, top: 198 },  // slot 5 (bottom-right)
+  { left: 280, top: 179 },  // slot 6
+  { left: 323, top: 143 },  // slot 7
+  { left: 350, top: 94  },  // slot 8 (top-right rim)
 ];
 
 /* ── Ingredient SVG icons ── */
@@ -127,17 +129,20 @@ function IngredientIcon({ ingredient, size = 28 }: { ingredient: IngredientKey; 
 function BowlSilhouette() {
   return (
     <svg
-      viewBox="0 0 260 180"
+      viewBox="0 0 400 260"
       className="absolute inset-0 w-full h-full pointer-events-none"
       aria-hidden="true"
     >
+      {/* Bowl rim — straight line connecting slot 1 and slot 8 centers */}
+      <line x1="50" y1="94" x2="350" y2="94" stroke="#c9dac2" strokeWidth="1.5" strokeDasharray="4 4" opacity="0.5" />
+      {/* Bowl curve — arc through slot positions matching the 160-radius circle */}
       <path
-        d="M30 130 Q30 170 130 170 Q230 170 230 130"
+        d="M 50 94 A 160 160 0 0 0 350 94"
         fill="none"
         stroke="#c9dac2"
         strokeWidth="1.5"
-        strokeDasharray="6 4"
-        opacity="0.4"
+        strokeDasharray="4 4"
+        opacity="0.5"
       />
     </svg>
   );
@@ -223,6 +228,24 @@ export default function StampCardComponent({ card, entries, lang }: Props) {
     }
   }, []);
 
+  const addTestStamp = useCallback(async () => {
+    if (!currentCard || currentCard.stamps_collected >= 8) return;
+    setLoading(true);
+    try {
+      const res = await fetch("/api/loyalty", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "add_test_stamp" }),
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setCurrentCard(data.card);
+      setCurrentEntries(data.entries ?? []);
+    } finally {
+      setLoading(false);
+    }
+  }, [currentCard]);
+
   const redeemReward = useCallback(async () => {
     if (!selectedReward) return;
     setLoading(true);
@@ -273,15 +296,17 @@ export default function StampCardComponent({ card, entries, lang }: Props) {
         <div className="stamp-arc-wrap">
           <BowlSilhouette />
 
-          {/* Center mascot */}
+          {/* Center mascot — sits inside the bowl, opacity scales with progress */}
           <div
-            className="absolute left-1/2 -translate-x-1/2 transition-opacity duration-500"
+            className="absolute pointer-events-none transition-opacity duration-500"
             style={{
-              bottom: "20px",
+              left: "50%",
+              top: "140px",
+              transform: "translate(-50%, -50%)",
               opacity: getMascotOpacity(stampsCollected),
             }}
           >
-            <IngredientIcon ingredient="mascot" size={40} />
+            <IngredientIcon ingredient="mascot" size={56} />
           </div>
 
           {/* Confetti when all 8 */}
@@ -310,9 +335,12 @@ export default function StampCardComponent({ card, entries, lang }: Props) {
                 key={i}
                 className={slotClass}
                 style={{ left: `${pos.left}px`, top: `${pos.top}px` }}
+                onClick={isEmpty && slotNum === stampsCollected + 1 ? addTestStamp : undefined}
+                role={isEmpty ? "button" : undefined}
+                aria-label={isEmpty ? `Click to test stamp ${slotNum}` : undefined}
               >
                 {isFilled ? (
-                  <IngredientIcon ingredient={displayIngredient} size={28} />
+                  <IngredientIcon ingredient={displayIngredient} size={26} />
                 ) : (
                   <span className="text-kale-300 text-xs font-body">{slotNum}</span>
                 )}

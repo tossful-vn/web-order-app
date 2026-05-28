@@ -59,6 +59,70 @@ export async function POST(request: Request) {
     return NextResponse.json({ card: newCard, entries: [] });
   }
 
+  /* ── add_test_stamp (testing only — simulates an order earning a stamp) ── */
+  if (action === "add_test_stamp") {
+    const { data: card } = await supabase
+      .from("stamp_cards")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("reward_status", "collecting")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!card) {
+      return NextResponse.json({ error: "No active collecting card" }, { status: 404 });
+    }
+
+    if (card.stamps_collected >= 8) {
+      return NextResponse.json({ error: "Card already full" }, { status: 400 });
+    }
+
+    const nextStampNum = card.stamps_collected + 1;
+    const ingredientPool = ["carrot", "avocado", "beetroot", "chili", "edamame", "nut", "herb"];
+    const ingredient = nextStampNum === 8 ? "mascot" : ingredientPool[(nextStampNum - 1) % 7];
+
+    // Insert the stamp entry
+    const { error: entryErr } = await supabase.from("stamp_entries").insert({
+      card_id: card.id,
+      stamp_number: nextStampNum,
+      ingredient_key: ingredient,
+    });
+
+    if (entryErr) {
+      return NextResponse.json({ error: entryErr.message }, { status: 500 });
+    }
+
+    // Update the card
+    const isComplete = nextStampNum === 8;
+    const updateFields: Record<string, unknown> = { stamps_collected: nextStampNum };
+    if (isComplete) {
+      updateFields.reward_status = "reward_ready";
+      updateFields.reward_earned_at = new Date().toISOString();
+      updateFields.reward_expires_at = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    }
+
+    const { data: updatedCard, error: updateErr } = await supabase
+      .from("stamp_cards")
+      .update(updateFields)
+      .eq("id", card.id)
+      .select()
+      .single();
+
+    if (updateErr) {
+      return NextResponse.json({ error: updateErr.message }, { status: 500 });
+    }
+
+    // Fetch all entries
+    const { data: entries } = await supabase
+      .from("stamp_entries")
+      .select("*")
+      .eq("card_id", card.id)
+      .order("stamp_number", { ascending: true });
+
+    return NextResponse.json({ card: updatedCard, entries: entries ?? [] });
+  }
+
   /* ── redeem_reward ── */
   if (action === "redeem_reward") {
     const choice = body.choice as string;

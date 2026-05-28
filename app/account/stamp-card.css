@@ -1,28 +1,39 @@
 /* ── Stamp card arc layout ── */
 .stamp-arc-wrap {
   position: relative;
-  width: 260px;
-  height: 180px;
+  width: 400px;
+  height: 260px;
+  max-width: 100%;
 }
 
 /* ── Individual stamp slot ── */
 .stamp-slot {
   position: absolute;
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: border-color 0.3s ease, background-color 0.3s ease, box-shadow 0.3s ease;
-  /* Offset by half the slot size so the center of the circle lands on the coordinate */
-  margin-left: -24px;
-  margin-top: -24px;
+  transition: border-color 0.3s ease, background-color 0.3s ease, box-shadow 0.3s ease, transform 0.15s ease;
+  margin-left: -22px;
+  margin-top: -22px;
 }
 
 .stamp-slot.empty {
   border: 1.5px dashed #c9dac2;
   background: transparent;
+  cursor: pointer;
+}
+
+.stamp-slot.empty:hover {
+  border-color: #5c8650;
+  background: rgba(243, 247, 241, 0.6);
+  transform: scale(1.1);
+}
+
+.stamp-slot.empty:active {
+  transform: scale(0.95);
 }
 
 .stamp-slot.filled {
