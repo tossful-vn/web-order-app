@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import "./stamp-card.css";
 import type { StampCard, StampEntry, IngredientKey } from "@/lib/types/loyalty";
 import { REWARD_OPTIONS } from "@/lib/types/loyalty";
+import IngredientInfographic from "./IngredientInfographic.client";
 
 type Props = {
   card: StampCard | null;
@@ -206,6 +207,7 @@ export default function StampCardComponent({ card, entries, lang }: Props) {
   const [loading, setLoading] = useState(false);
   const [showRewardPicker, setShowRewardPicker] = useState(false);
   const [selectedReward, setSelectedReward] = useState<"bowl" | "protein" | "topping" | "drink" | null>(null);
+  const [infographicSlot, setInfographicSlot] = useState<{ ingredient: "carrot" | "avocado" | "beetroot" | "chili" | "edamame" | "nut" | "herb"; stampNumber: number } | null>(null);
 
   const stampsCollected = currentCard?.stamps_collected ?? 0;
   const stampsRemaining = 8 - stampsCollected;
@@ -241,6 +243,15 @@ export default function StampCardComponent({ card, entries, lang }: Props) {
       const data = await res.json();
       setCurrentCard(data.card);
       setCurrentEntries(data.entries ?? []);
+      // Auto-open the infographic for the newly earned stamp (only for ingredient stamps, not the mascot/reward slot)
+      const newEntries = (data.entries ?? []) as StampEntry[];
+      const newest = newEntries[newEntries.length - 1];
+      if (newest && newest.ingredient_key !== "mascot") {
+        setInfographicSlot({
+          ingredient: newest.ingredient_key as "carrot" | "avocado" | "beetroot" | "chili" | "edamame" | "nut" | "herb",
+          stampNumber: newest.stamp_number,
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -330,14 +341,30 @@ export default function StampCardComponent({ card, entries, lang }: Props) {
 
             const displayIngredient = filledIngredient ?? SLOT_INGREDIENTS[i];
 
+            const handleSlotClick = () => {
+              if (isEmpty && slotNum === stampsCollected + 1) {
+                addTestStamp();
+              } else if (isFilled && filledIngredient && filledIngredient !== "mascot") {
+                setInfographicSlot({
+                  ingredient: filledIngredient as "carrot" | "avocado" | "beetroot" | "chili" | "edamame" | "nut" | "herb",
+                  stampNumber: slotNum,
+                });
+              }
+            };
+            const isClickable = (isEmpty && slotNum === stampsCollected + 1) || (isFilled && filledIngredient && filledIngredient !== "mascot");
+
             return (
               <div
                 key={i}
                 className={slotClass}
-                style={{ left: `${pos.left}px`, top: `${pos.top}px` }}
-                onClick={isEmpty && slotNum === stampsCollected + 1 ? addTestStamp : undefined}
-                role={isEmpty ? "button" : undefined}
-                aria-label={isEmpty ? `Click to test stamp ${slotNum}` : undefined}
+                style={{
+                  left: `${pos.left}px`,
+                  top: `${pos.top}px`,
+                  cursor: isClickable ? "pointer" : undefined,
+                }}
+                onClick={isClickable ? handleSlotClick : undefined}
+                role={isClickable ? "button" : undefined}
+                aria-label={isEmpty ? `Click to test stamp ${slotNum}` : isFilled ? `View ${filledIngredient} info` : undefined}
               >
                 {isFilled ? (
                   <IngredientIcon ingredient={displayIngredient} size={26} />
@@ -384,6 +411,16 @@ export default function StampCardComponent({ card, entries, lang }: Props) {
           <p className="text-sm text-kale-600 font-body italic">{s.redeemed}</p>
         )}
       </div>
+
+      {/* Ingredient infographic modal */}
+      {infographicSlot && (
+        <IngredientInfographic
+          ingredientKey={infographicSlot.ingredient}
+          stampNumber={infographicSlot.stampNumber}
+          lang={lang}
+          onClose={() => setInfographicSlot(null)}
+        />
+      )}
 
       {/* Reward picker overlay */}
       {showRewardPicker && (
