@@ -127,26 +127,6 @@ function IngredientIcon({ ingredient, size = 28 }: { ingredient: IngredientKey; 
 }
 
 /* ── Bowl silhouette (sits behind the arc) ── */
-function HaloOutline() {
-  return (
-    <svg
-      viewBox="0 0 400 300"
-      className="absolute inset-0 w-full h-full pointer-events-none"
-      aria-hidden="true"
-    >
-      {/* Dashed ∩ arc tracing the stamp slots — gentle visual anchor */}
-      <path
-        d="M 50 160 Q 200 0 350 160"
-        fill="none"
-        stroke="#c9dac2"
-        strokeWidth="1.5"
-        strokeDasharray="4 4"
-        opacity="0.5"
-      />
-    </svg>
-  );
-}
-
 /* ── Tossful semicircle wordmark — sits below the stamps in a ∪ smile ── */
 function TossfulWordmark() {
   return (
@@ -159,7 +139,8 @@ function TossfulWordmark() {
         {/* Arc curving downward (∪ shape) — text follows the upper side */}
         <path id="tossful-arc" d="M 60 220 Q 200 300 340 220" fill="none" />
       </defs>
-      <text fontSize="34">
+      {/* Style matches header logo: Fraunces italic, kale-700, tightened tracking */}
+      <text fontSize="40" style={{ letterSpacing: "-0.5px" }}>
         <textPath href="#tossful-arc" startOffset="50%" textAnchor="middle">
           Tossful
         </textPath>
@@ -316,8 +297,6 @@ export default function StampCardComponent({ card, entries, lang }: Props) {
       {/* Arc layout */}
       <div className="flex justify-center mb-6">
         <div className="stamp-arc-wrap">
-          <HaloOutline />
-
           {/* Tossful wordmark — semicircle below the stamps */}
           <TossfulWordmark />
 

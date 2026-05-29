@@ -252,6 +252,9 @@ export default function IngredientInfographic({ ingredientKey, stampNumber, lang
   const surprises: IngredientSurprise[] = data.surprises;
   const surprise = surprises[surpriseIdx] ?? surprises[0];
   const categoryLabel = CATEGORY_LABELS[surprise.category]?.[lang] ?? surprise.category;
+  const surpriseTitle = lang === "vi" ? surprise.title_vn : surprise.title;
+  const surpriseBody = lang === "vi" ? surprise.body_vn : surprise.body;
+  const surpriseSource = lang === "vi" ? surprise.source_vn : surprise.source;
 
   const name = lang === "vi" ? data.name_vn : data.name_en;
   const altName = lang === "vi" ? data.name_en : data.name_vn;
@@ -304,14 +307,14 @@ export default function IngredientInfographic({ ingredientKey, stampNumber, lang
             className="font-display italic"
             style={{ fontSize: "20px", color: "#faf7f0", lineHeight: 1.25, marginBottom: "10px" }}
           >
-            {surprise.title}
+            {surpriseTitle}
           </h3>
 
           <p
             className="font-body"
             style={{ fontSize: "13px", color: "#c9dac2", lineHeight: 1.6 }}
           >
-            {renderBody(surprise.body)}
+            {renderBody(surpriseBody)}
           </p>
 
           {/* Divider */}
@@ -330,7 +333,7 @@ export default function IngredientInfographic({ ingredientKey, stampNumber, lang
               className="font-body"
               style={{ fontSize: "11px", color: "#a4c098", letterSpacing: "0.02em" }}
             >
-              {s.source}: {surprise.source}
+              {s.source}: {surpriseSource}
             </span>
           </div>
 
