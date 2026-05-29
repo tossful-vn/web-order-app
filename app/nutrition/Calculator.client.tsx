@@ -229,18 +229,30 @@ export default function Calculator() {
   const supabase = useMemo(() => createClient(), []);
   const [userName, setUserName] = useState<string | null>(null);
   const [store, setStore] = useState<StoreCity>("HN"); // default HN (cheaper menu)
+  // Saved bowls (compressed to {name, sortedIds}) for combo-match labelling.
+  // Lets the macro-bar pill show the saved-bowl's name when the customer
+  // builds the same combination again later.
+  const [savedBowlsForMatch, setSavedBowlsForMatch] = useState<Array<{ name: string; ids: string[] }>>([]);
   useEffect(() => {
-    // Pull profile display_name + preferred_store on mount. Anonymous
-    // visitors render generic copy and default store (HN, cheaper menu).
+    // Pull profile display_name + preferred_store + saved bowl combos on
+    // mount. Anonymous visitors render generic copy and default store (HN).
     let cancelled = false;
     void (async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (cancelled || !user) return;
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("display_name, preferred_store")
-        .eq("id", user.id)
-        .maybeSingle();
+      const [{ data: profile }, { data: savedBowls }] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("display_name, preferred_store")
+          .eq("id", user.id)
+          .maybeSingle(),
+        supabase
+          .from("saved_bowls")
+          .select("name, composition")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(80),
+      ]);
       if (cancelled) return;
       const dn = (profile?.display_name ?? "").trim();
       if (dn) {
@@ -256,9 +268,41 @@ export default function Calculator() {
       } else if (ps === "HN" || ps === "HANOI" || ps === "HÀ NỘI") {
         setStore("HN");
       }
+      // Compress saved bowls to {name, sortedIds} for fast equality compare.
+      // We only need ids; quantities aren't tracked in composition the same
+      // way as `selected`, but the use case is "did the customer build the
+      // same set of ingredients again" — id-set match is enough.
+      type Composition = {
+        base?: { id?: string } | null;
+        cot?: { id?: string } | null;
+        toppings?: Array<{ id?: string }> | null;
+        proteins?: Array<{ id?: string }> | null;
+        dressing?: { id?: string } | null;
+        xot?: { id?: string } | null;
+        fixed?: Array<{ id?: string }> | null;
+      };
+      const compressed: Array<{ name: string; ids: string[] }> = [];
+      for (const sb of (savedBowls ?? []) as Array<{ name: string; composition: Composition | null }>) {
+        const comp = sb.composition ?? {};
+        const ids = new Set<string>();
+        const push = (i?: { id?: string } | null) => { if (i?.id) ids.add(i.id); };
+        push(comp.base);
+        push(comp.cot);
+        push(comp.dressing);
+        push(comp.xot);
+        (comp.toppings ?? []).forEach(push);
+        (comp.proteins ?? []).forEach(push);
+        (comp.fixed ?? []).forEach(push);
+        if (ids.size > 0) {
+          compressed.push({ name: sb.name, ids: [...ids].sort() });
+        }
+      }
+      setSavedBowlsForMatch(compressed);
     })();
     return () => { cancelled = true; };
   }, [supabase]);
+
+
 
   // Personalize template strings — replaces {name} when we have one,
   // falls back to the generic version otherwise.
@@ -471,6 +515,31 @@ export default function Calculator() {
     if (!currentIds.every((id) => selected[id] === 1)) return false;
     return true;
   }, [signatureItem, signatureSnapshot, selected]);
+
+  // Find a saved bowl whose ingredient-id set exactly matches the current
+  // selection. First match wins (most-recently-saved per query order).
+  const matchedSavedBowlName = useMemo<string | null>(() => {
+    const currentIds = Object.keys(selected);
+    if (currentIds.length === 0) return null;
+    const currentSet = new Set(currentIds);
+    for (const sb of savedBowlsForMatch) {
+      if (sb.ids.length !== currentIds.length) continue;
+      if (sb.ids.every((id) => currentSet.has(id))) {
+        return sb.name;
+      }
+    }
+    return null;
+  }, [selected, savedBowlsForMatch]);
+
+  // Macro-bar pill label: signature name (pristine) → saved bowl name →
+  // generic "Tô của bạn" fallback. Order matters — most-specific first.
+  const barLabel = useMemo<string>(() => {
+    if (isPristineSignature && signatureItem) {
+      return pickName(signatureItem, lang);
+    }
+    if (matchedSavedBowlName) return matchedSavedBowlName;
+    return I18N[lang].bowl_label;
+  }, [isPristineSignature, signatureItem, matchedSavedBowlName, lang]);
 
   const summaryRows = useMemo(() => {
     const rows: { item: Item; qty: number; portion: number; cal: number; price: number }[] = [];
@@ -762,7 +831,7 @@ export default function Calculator() {
 
             <div
               className="infographic"
-              style={{ ["--bowl-label" as never]: `"${str.bowl_label}"` }}
+              style={{ ["--bowl-label" as never]: `"${barLabel.replace(/"/g, '\\"')}"` }}
             >
               <div className="igrid">
                 {(Object.keys(DAILY) as MacroKey[]).map((key) => {
