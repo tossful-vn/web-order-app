@@ -170,3 +170,42 @@
 .tossful-calc .back-link { display: inline-flex; align-items: center; gap: 6px; background: transparent; border: 0; padding: 12px 20px 0; font-family: inherit; font-size: 12px; color: #0F563D; cursor: pointer; }
 .tossful-calc .back-link:hover { text-decoration: underline; }
 .tossful-calc .back-link i { font-size: 16px; }
+
+/* Summary-item quantity controls (v12) — sits between name and grams. */
+.tossful-calc .summary-item .qty-ctrl {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #f3f7f1;
+  border-radius: 999px;
+  padding: 2px 4px;
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+.tossful-calc .summary-item .qty-ctrl .qty-btn {
+  width: 22px;
+  height: 22px;
+  border: 0;
+  background: transparent;
+  color: #0F563D;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 13px;
+  transition: background 0.12s ease;
+}
+.tossful-calc .summary-item .qty-ctrl .qty-btn:hover {
+  background: rgba(15, 86, 61, 0.12);
+}
+.tossful-calc .summary-item .qty-ctrl .qty-num {
+  min-width: 16px;
+  text-align: center;
+  font-family: 'Questrial', sans-serif;
+  font-size: 12px;
+  color: #0F563D;
+  font-weight: 500;
+  line-height: 1;
+}

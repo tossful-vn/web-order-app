@@ -131,12 +131,20 @@ function formatSigName(rawName: string): string {
   return rawName;
 }
 
+// Simple deterministic string hash → use to pick a template per ingredient set
+// so same bowl always gets the same name (not random each render).
+function hashStr(s: string): number {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = (h * 33 + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+
 function suggestBowlName(
   selected: Record<string, number>,
   items: Item[],
   lang: Lang,
 ): string {
-  const ids = Object.keys(selected);
+  const ids = Object.keys(selected).sort();
   if (ids.length === 0) return "";
   const picked = ids
     .map((id) => items.find((i) => i.id === id))
@@ -148,25 +156,88 @@ function suggestBowlName(
   const dressing = (byCat["Dressing"] ?? [])[0];
   const topping = (byCat["Topping"] ?? [])[0];
   const n = (it: Item) => pickName(it, lang);
+  const h = hashStr(ids.join(","));
+
   if (lang === "vi") {
-    if (base && protein) return "Tô " + n(protein) + " + " + n(base);
-    if (base && dressing) return "Tô " + n(base) + " sot " + n(dressing);
-    if (base && topping) return "Tô " + n(base) + " " + n(topping);
-    if (base) return "Tô " + n(base);
-    if (protein) return "Tô " + n(protein);
-    return "Tô của bạn";
+    // Witty Vietnamese templates — pick deterministically by ingredient-set hash.
+    // Each template references zero-to-many ingredients; only templates that
+    // fit the current selection are eligible.
+    type T = { ok: boolean; render: () => string };
+    const templates: T[] = [
+      { ok: !!(base && protein), render: () => `${n(protein)} Bùng Vị ${n(base)}` },
+      { ok: !!(base && protein), render: () => `Combo ${n(protein)} ${n(base)} Đỉnh Cao` },
+      { ok: !!(base && protein), render: () => `Tô ${n(protein)} Mê Đắm` },
+      { ok: !!(base && topping), render: () => `${n(base)} Cười Tươi` },
+      { ok: !!(base && topping), render: () => `Tô ${n(base)} Hảo Hạng` },
+      { ok: !!(base && dressing), render: () => `${n(base)} Sốt ${n(dressing)} Quyến Rũ` },
+      { ok: !!protein, render: () => `Tô ${n(protein)} Vui Vẻ` },
+      { ok: !!base, render: () => `Vương Quốc ${n(base)}` },
+      { ok: !!topping, render: () => `Tô Có ${n(topping)} Là Vui` },
+      { ok: !!dressing, render: () => `Sốt ${n(dressing)} Là Đỉnh` },
+      { ok: picked.length >= 5, render: () => "Tô Đỉnh Của Đỉnh" },
+      { ok: picked.length >= 3, render: () => "Tô Tươi Mát Hôm Nay" },
+      { ok: true, render: () => "Tô Cá Tính" },
+    ];
+    const eligible = templates.filter((t) => t.ok);
+    return eligible[h % eligible.length].render();
   }
-  if (base && protein) return n(base) + " + " + n(protein) + " bowl";
-  if (base && dressing) return n(dressing) + " " + n(base).toLowerCase() + " bowl";
-  if (base && topping) return n(topping) + " " + n(base).toLowerCase() + " bowl";
-  if (base) return n(base) + " bowl";
-  if (protein) return n(protein) + " bowl";
-  return "Your bowl";
+
+  // English — same approach, brand-voice witty templates
+  type T = { ok: boolean; render: () => string };
+  const templates: T[] = [
+    { ok: !!(base && protein), render: () => `${n(protein)} Meets ${n(base)}` },
+    { ok: !!(base && protein), render: () => `The ${n(protein)} Bowl Saga` },
+    { ok: !!(base && protein), render: () => `${n(protein)} on a ${n(base)} Throne` },
+    { ok: !!(base && topping), render: () => `${n(base)} Goes Wild` },
+    { ok: !!(base && topping), render: () => `${n(topping)}-Topped Triumph` },
+    { ok: !!(base && dressing), render: () => `${n(dressing)} Affair with ${n(base)}` },
+    { ok: !!protein, render: () => `The ${n(protein)} Wake-Up` },
+    { ok: !!base, render: () => `${n(base)} Symphony` },
+    { ok: !!topping, render: () => `Hold the Doubt, Pile the ${n(topping)}` },
+    { ok: !!dressing, render: () => `${n(dressing)} Frenzy` },
+    { ok: picked.length >= 5, render: () => "The Whole Garden Bowl" },
+    { ok: picked.length >= 3, render: () => "Today's Mood Bowl" },
+    { ok: true, render: () => "Bowled Over" },
+  ];
+  const eligible = templates.filter((t) => t.ok);
+  return eligible[h % eligible.length].render();
 }
 
 // ===== Component =====
 export default function Calculator() {
   const supabase = useMemo(() => createClient(), []);
+  const [userName, setUserName] = useState<string | null>(null);
+  useEffect(() => {
+    // Pull profile display_name on mount — falls back to email username if
+    // profile is missing/unset. Anonymous visitors render generic copy.
+    let cancelled = false;
+    void (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (cancelled || !user) return;
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("display_name")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (cancelled) return;
+      const dn = (profile?.display_name ?? "").trim();
+      if (dn) {
+        setUserName(dn.split(/\s+/)[0]); // first word only — friendlier
+      } else if (user.email) {
+        // Fallback: email local-part, capitalised
+        const local = user.email.split("@")[0];
+        setUserName(local.charAt(0).toUpperCase() + local.slice(1));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [supabase]);
+
+  // Personalize template strings — replaces {name} when we have one,
+  // falls back to the generic version otherwise.
+  const personalize = useCallback((template: string, fallback: string): string => {
+    if (!userName) return fallback;
+    return template.replace(/\{name\}/g, userName);
+  }, [userName]);
 
   const [lang] = useLang();
   const [view, setView] = useState<View>("choose");
@@ -562,8 +633,8 @@ export default function Calculator() {
         {view === "choose" && (
           <>
             <div className="hero">
-              <h1>{str.hero_title}</h1>
-              <div className="tagline">{str.page_title} &middot; {str.page_subtitle}</div>
+              <h1>{personalize(str.hero_title_named, str.hero_title)}</h1>
+              <div className="tagline">{personalize(str.page_title_named, str.page_title)} &middot; {str.page_subtitle}</div>
               <p className="choose-q">{str.choose_q}</p>
             </div>
             <div className="starter-stack">
@@ -617,8 +688,8 @@ export default function Calculator() {
               <i className="ti ti-arrow-left" aria-hidden="true" /> {str.back_to_start}
             </button>
             <div className="hero">
-              <h1>{str.hero_title}</h1>
-              <div className="tagline">{str.page_title} &middot; {str.page_subtitle}</div>
+              <h1>{personalize(str.hero_title_named, str.hero_title)}</h1>
+              <div className="tagline">{personalize(str.page_title_named, str.page_title)} &middot; {str.page_subtitle}</div>
               <p>{str.hero_subtitle}</p>
             </div>
 
@@ -891,10 +962,26 @@ export default function Calculator() {
                               <i className="ti ti-bowl" aria-hidden="true" />
                             )}
                           </div>
-                          <span className="name">
-                            {pickName(item, lang)}{" "}
-                            {qty > 1 && <span className="qty-badge">x{qty}</span>}
-                          </span>
+                          <span className="name">{pickName(item, lang)}</span>
+                          <div className="qty-ctrl" aria-label={`Quantity ${qty}`}>
+                            <button
+                              type="button"
+                              className="qty-btn"
+                              aria-label={`Decrease ${pickName(item, lang)}`}
+                              onClick={() => decrementQty(item)}
+                            >
+                              <i className="ti ti-minus" aria-hidden="true" />
+                            </button>
+                            <span className="qty-num">{qty}</span>
+                            <button
+                              type="button"
+                              className="qty-btn"
+                              aria-label={`Increase ${pickName(item, lang)}`}
+                              onClick={() => incrementQty(item)}
+                            >
+                              <i className="ti ti-plus" aria-hidden="true" />
+                            </button>
+                          </div>
                           <span className="gram">{Math.round(portion)}g</span>
                           <button
                             className="remove"

@@ -7,6 +7,8 @@ export type Lang = "en" | "vi";
 
 export type StringTable = {
   page_title: string; page_subtitle: string;
+  page_title_named: string; // template, {name} substituted
+  hero_title_named: string; // template, {name} substituted
   tab_signature: string; tab_byo: string; tab_feedback: string;
   hero_title: string; hero_subtitle: string;
   bowl_label: string;
@@ -54,6 +56,8 @@ export type StringTable = {
 
 const EN: StringTable = {
   page_title: "a bowl for everyone",
+  page_title_named: "a bowl for {name}",
+  hero_title_named: "Plan {name}'s bowl.",
   page_subtitle: "nutrition calculator",
   tab_signature: "Signature bowls",
   tab_byo: "Build your own",
@@ -126,6 +130,8 @@ const VI_tab_signature = "Tô signature";
 const VI_tab_byo = "Tự thiết kế";
 const VI_tab_feedback = "Góp ý";
 const VI_hero_title = "Lên kế hoạch tô của bạn.";
+const VI_page_title_named = "một tô cho {name}";
+const VI_hero_title_named = "Lên kế hoạch tô của {name}.";
 const VI_hero_subtitle = "Chọn nguyên liệu để xem dinh dưỡng trực tiếp.";
 const VI_bowl_label = "Tô của bạn";
 const VI_your_bowl = "Tô của bạn";
@@ -200,6 +206,8 @@ const VI_save_tip = "Mẹo: chụp màn hình để lưu hoặc chia sẻ. Cảm
 
 const VI: StringTable = {
   page_title: VI_page_title, page_subtitle: VI_page_subtitle,
+  page_title_named: VI_page_title_named,
+  hero_title_named: VI_hero_title_named,
   tab_signature: VI_tab_signature, tab_byo: VI_tab_byo, tab_feedback: VI_tab_feedback,
   hero_title: VI_hero_title, hero_subtitle: VI_hero_subtitle,
   bowl_label: VI_bowl_label,
