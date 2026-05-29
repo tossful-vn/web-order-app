@@ -39,6 +39,14 @@ export type IngredientData = {
   growing_vn: string;
   fun_fact_en?: string;
   fun_fact_vn?: string;
+  /** Per-ingredient override for the small caption above the nutrition rings.
+   *  Use when the basis differs from the default "Per 100g raw" (e.g. typical
+   *  serving size for nuts), or when the values are flagged for review. */
+  nutrition_basis_en?: string;
+  nutrition_basis_vn?: string;
+  /** When true, render the basis caption in brand amber to signal data is
+   *  unverified and pending review. */
+  nutrition_basis_review?: boolean;
   surprises: IngredientSurprise[]; // 2-3 per ingredient, rotated/swiped
 };
 
@@ -379,6 +387,9 @@ export const INGREDIENT_DATA: Record<string, IngredientData> = {
       "Imported from cool-climate orchards in California and Chile — Vietnam's climate is too humid for the tree. We buy whole halves only (not pieces), then portion and toast daily so freshness never drops.",
     growing_vn:
       "Nhập từ vườn khí hậu mát ở California và Chile — Việt Nam ẩm quá để trồng. Tossful chỉ mua nguyên múi (không vụn), rồi chia nhỏ và rang trong ngày để giữ độ tươi.",
+    nutrition_basis_en: "Need Review — pending shelled vs in-shell clarification",
+    nutrition_basis_vn: "Cần kiểm tra — chưa xác định nhân hay nguyên vỏ",
+    nutrition_basis_review: true,
     fun_fact_en: "A walnut's shape resembles a brain — and it's the only nut with a meaningful amount of the omega-3 your brain actually uses.",
     fun_fact_vn: "Hình dáng quả óc chó giống bộ não — và đây là loại hạt duy nhất có hàm lượng omega-3 đáng kể mà não cần.",
     surprises: [

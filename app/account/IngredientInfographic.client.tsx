@@ -401,12 +401,27 @@ export default function IngredientInfographic({ ingredientKey, stampNumber, lang
           </div>
 
           {/* Nutrition rings */}
-          <p
-            className="font-body text-kale-500 text-center"
-            style={{ fontSize: "11px", letterSpacing: "0.04em", marginTop: "-4px", marginBottom: "8px", fontStyle: "italic" }}
-          >
-            {s.nutrition_basis}
-          </p>
+          {(() => {
+            const overrideCaption = lang === "vi" ? data.nutrition_basis_vn : data.nutrition_basis_en;
+            const captionText = overrideCaption ?? s.nutrition_basis;
+            const isReview = data.nutrition_basis_review === true;
+            return (
+              <p
+                className={`font-body text-center ${isReview ? "" : "text-kale-500"}`}
+                style={{
+                  fontSize: "11px",
+                  letterSpacing: "0.04em",
+                  marginTop: "-4px",
+                  marginBottom: "8px",
+                  fontStyle: "italic",
+                  color: isReview ? "#F68C02" : undefined,
+                  fontWeight: isReview ? 500 : 400,
+                }}
+              >
+                {captionText}
+              </p>
+            );
+          })()}
           <div className="nutri-rings-row">
             {data.nutrition.map((n, i) => (
               <NutritionRing key={i} {...n} />
