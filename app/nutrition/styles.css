@@ -38,7 +38,29 @@
 .tossful-calc .hero { padding: 14px 20px 0; }
 .tossful-calc .hero h1 { font-family: 'Questrial', system-ui, sans-serif; font-style: normal; font-weight: 400; font-size: 24px; line-height: 1.15; color: #0F563D; margin: 0 0 4px; letter-spacing: -0.3px; }
 .tossful-calc .hero p { font-size: 12px; color: #5F5E5A; margin: 0; }
-.tossful-calc .infographic { margin: 6px 12px 6px; background: #0F563D; color: #F4F1E6; border-radius: 16px; padding: 14px 10px 10px; position: sticky; top: 60px; z-index: 20; box-shadow: 0 4px 14px rgba(15,86,61,0.25); /* top accounts for AppShell sticky header (~56px) + 4px breathing room */ }
+.tossful-calc .infographic {
+  /* Pinned to the bottom of the viewport — always visible while the customer
+     scrolls through ingredient categories. Centered, capped width. */
+  position: fixed;
+  bottom: 12px;
+  left: 12px;
+  right: 12px;
+  max-width: 456px;
+  margin-left: auto;
+  margin-right: auto;
+  background: #0F563D;
+  color: #F4F1E6;
+  border-radius: 16px;
+  padding: 14px 10px 10px;
+  z-index: 30;
+  box-shadow: 0 8px 24px rgba(15, 86, 61, 0.32);
+}
+
+/* Reserve room at the page bottom so the last row of ingredient chips isn't
+   permanently hidden under the floating macro bar. */
+.tossful-calc {
+  padding-bottom: 140px;
+}
 .tossful-calc .infographic::before { content: var(--bowl-label, 'Your bowl'); position: absolute; top: -8px; left: 14px; background: #F68C02; color: #fff; font-size: 8px; padding: 2px 9px; border-radius: 999px; letter-spacing: 0.4px; white-space: nowrap; }
 .tossful-calc .igrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; }
 .tossful-calc .ring-item { text-align: center; position: relative; }
