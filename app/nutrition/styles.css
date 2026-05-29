@@ -249,3 +249,18 @@
   font-style: normal;
   font-family: 'Questrial', sans-serif;
 }
+
+/* v15 — signature-discount indicator next to total price. */
+.tossful-calc .summary h3 .total-price .signature-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: #0F563D;
+  color: #FFE9C2;
+  border-radius: 999px;
+  font-weight: 500;
+  vertical-align: 1px;
+}

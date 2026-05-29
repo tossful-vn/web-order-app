@@ -445,6 +445,33 @@ export default function Calculator() {
     return counts;
   }, [selected, items]);
 
+  // Find the signature Item (with menu price) backing the currently-applied
+  // signature, if any. Match by name_en since lastAppliedSignature stores the
+  // bowl's display name.
+  const signatureItem = useMemo<Item | null>(() => {
+    if (!lastAppliedSignature) return null;
+    return (
+      items.find(
+        (i) => i.category === "Signature" && i.name_en === lastAppliedSignature,
+      ) ?? null
+    );
+  }, [lastAppliedSignature, items]);
+
+  // True when the current selection EXACTLY matches the snapshot taken at
+  // signature-apply time: same ingredient IDs, no extras, every qty === 1.
+  // Any modification (added/removed ingredient, qty bump) flips this false
+  // and we revert to sum-of-ingredients pricing — signatures bundle a
+  // discount that doesn't apply to customised bowls.
+  const isPristineSignature = useMemo(() => {
+    if (!signatureItem || !signatureSnapshot) return false;
+    const currentIds = Object.keys(selected);
+    if (currentIds.length !== signatureSnapshot.ingredients.length) return false;
+    const snapSet = new Set(signatureSnapshot.ingredients);
+    if (!currentIds.every((id) => snapSet.has(id))) return false;
+    if (!currentIds.every((id) => selected[id] === 1)) return false;
+    return true;
+  }, [signatureItem, signatureSnapshot, selected]);
+
   const summaryRows = useMemo(() => {
     const rows: { item: Item; qty: number; portion: number; cal: number; price: number }[] = [];
     let totalG = 0;
@@ -463,8 +490,14 @@ export default function Calculator() {
         rows.push({ item, qty, portion, cal, price });
       }
     }
-    return { rows, totalG, totalCal, totalPrice };
-  }, [selected, items, store]);
+    // Signature discount: when bowl matches a signature exactly, price is
+    // the signature's own menu price (bundled discount), not the sum.
+    const finalPrice =
+      isPristineSignature && signatureItem
+        ? priceFor(signatureItem, store)
+        : totalPrice;
+    return { rows, totalG, totalCal, totalPrice: finalPrice, isSignaturePrice: isPristineSignature };
+  }, [selected, items, store, isPristineSignature, signatureItem]);
 
   // ===== Handlers =====
   const toggleChip = useCallback(
@@ -981,7 +1014,12 @@ export default function Calculator() {
                   {str.your_bowl}
                   <span className="total-g">
                     {summaryRows.totalPrice > 0 && (
-                      <span className="total-price">{formatPrice(summaryRows.totalPrice)}</span>
+                      <span className="total-price" title={summaryRows.isSignaturePrice ? "Giá signature (đã bao gồm ưu đãi combo) · Signature price (combo discount applied)" : undefined}>
+                        {formatPrice(summaryRows.totalPrice)}
+                        {summaryRows.isSignaturePrice && (
+                          <span className="signature-tag">signature</span>
+                        )}
+                      </span>
                     )}
                     <span className="total-g-num">{Math.round(summaryRows.totalG)} g</span>
                   </span>
