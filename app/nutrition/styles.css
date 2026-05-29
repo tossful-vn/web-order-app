@@ -209,3 +209,43 @@
   font-weight: 500;
   line-height: 1;
 }
+
+/* v14 — per-row + total bowl price styling.
+   Per-row price sits subtle under the calorie value.
+   Total price is the prominent header element. */
+.tossful-calc .summary-item .row-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
+  min-width: 56px;
+}
+.tossful-calc .summary-item .row-meta .row-price {
+  font-size: 10px;
+  color: #9aa39a;
+  font-family: 'Questrial', sans-serif;
+  font-style: normal;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.tossful-calc .summary h3 .total-price {
+  display: inline-block;
+  font-family: 'Questrial', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 16px;
+  color: #0F563D;
+  background: #FFE9C2;
+  padding: 3px 10px;
+  border-radius: 999px;
+  margin-right: 8px;
+  letter-spacing: 0.02em;
+}
+.tossful-calc .summary h3 .total-g-num {
+  font-size: 11px;
+  color: #5F5E5A;
+  font-weight: 400;
+  font-style: normal;
+  font-family: 'Questrial', sans-serif;
+}

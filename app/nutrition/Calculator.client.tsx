@@ -41,7 +41,28 @@ type Item = {
   customizable?: boolean;
   is_best_seller?: boolean | null;
   nutrition?: Nutrition | null;
+  price_vnd_hcm?: number | null;
+  price_vnd_hn?: number | null;
 };
+
+type StoreCity = "HN" | "HCM";
+
+// Format VND price as compact "Xk đ" or "Xk.Y đ" (e.g. 125000 → "125k đ", 109000 → "109k đ")
+function formatPrice(vnd: number | null | undefined): string {
+  if (!vnd || vnd <= 0) return "";
+  if (vnd >= 1000) {
+    const k = vnd / 1000;
+    // Use one decimal only if not whole (15500 → "15.5k đ")
+    const formatted = k % 1 === 0 ? k.toFixed(0) : k.toFixed(1);
+    return `${formatted}k đ`;
+  }
+  return `${vnd} đ`;
+}
+
+function priceFor(item: Item | undefined, store: StoreCity): number {
+  if (!item) return 0;
+  return (store === "HCM" ? item.price_vnd_hcm : item.price_vnd_hn) ?? 0;
+}
 
 /** Component from a signature recipe that the customer cannot edit. */
 type LockedComponent = {
@@ -207,16 +228,17 @@ function suggestBowlName(
 export default function Calculator() {
   const supabase = useMemo(() => createClient(), []);
   const [userName, setUserName] = useState<string | null>(null);
+  const [store, setStore] = useState<StoreCity>("HN"); // default HN (cheaper menu)
   useEffect(() => {
-    // Pull profile display_name on mount — falls back to email username if
-    // profile is missing/unset. Anonymous visitors render generic copy.
+    // Pull profile display_name + preferred_store on mount. Anonymous
+    // visitors render generic copy and default store (HN, cheaper menu).
     let cancelled = false;
     void (async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (cancelled || !user) return;
       const { data: profile } = await supabase
         .from("profiles")
-        .select("display_name")
+        .select("display_name, preferred_store")
         .eq("id", user.id)
         .maybeSingle();
       if (cancelled) return;
@@ -227,6 +249,12 @@ export default function Calculator() {
         // Fallback: email local-part, capitalised
         const local = user.email.split("@")[0];
         setUserName(local.charAt(0).toUpperCase() + local.slice(1));
+      }
+      const ps = (profile?.preferred_store ?? "").trim().toUpperCase();
+      if (ps === "HCM" || ps === "HCMC" || ps === "SAIGON" || ps === "HỒ CHÍ MINH") {
+        setStore("HCM");
+      } else if (ps === "HN" || ps === "HANOI" || ps === "HÀ NỘI") {
+        setStore("HN");
       }
     })();
     return () => { cancelled = true; };
@@ -279,7 +307,7 @@ export default function Calculator() {
         // BYO picker filters by in_menu downstream when building byoItems.
         const { data: rawItems, error: itemErr } = await supabase
           .from("items")
-          .select("id,name_en,name_vn,category,kind,tossful_portion_g,notes,in_menu,customizable,is_best_seller")
+          .select("id,name_en,name_vn,category,kind,tossful_portion_g,notes,in_menu,customizable,is_best_seller,price_vnd_hcm,price_vnd_hn")
           .eq("active", true)
           .in("category", ["Base", "Topping", "Premium", "Dressing", "Signature"])
           .order("category", { ascending: true })
@@ -418,22 +446,25 @@ export default function Calculator() {
   }, [selected, items]);
 
   const summaryRows = useMemo(() => {
-    const rows: { item: Item; qty: number; portion: number; cal: number }[] = [];
+    const rows: { item: Item; qty: number; portion: number; cal: number; price: number }[] = [];
     let totalG = 0;
     let totalCal = 0;
+    let totalPrice = 0;
     for (const cat of CATEGORY_ORDER) {
       for (const [id, qty] of Object.entries(selected)) {
         const item = items.find((i) => i.id === id);
         if (!item || item.category !== cat) continue;
         const portion = (item.tossful_portion_g ?? 0) * qty;
         const cal = macrosFor(item).calories * qty;
+        const price = priceFor(item, store) * qty;
         totalG += portion;
         totalCal += cal;
-        rows.push({ item, qty, portion, cal });
+        totalPrice += price;
+        rows.push({ item, qty, portion, cal, price });
       }
     }
-    return { rows, totalG, totalCal };
-  }, [selected, items]);
+    return { rows, totalG, totalCal, totalPrice };
+  }, [selected, items, store]);
 
   // ===== Handlers =====
   const toggleChip = useCallback(
@@ -948,13 +979,18 @@ export default function Calculator() {
               <div className="summary">
                 <h3>
                   {str.your_bowl}
-                  <span className="total-g">{Math.round(summaryRows.totalG)} g</span>
+                  <span className="total-g">
+                    {summaryRows.totalPrice > 0 && (
+                      <span className="total-price">{formatPrice(summaryRows.totalPrice)}</span>
+                    )}
+                    <span className="total-g-num">{Math.round(summaryRows.totalG)} g</span>
+                  </span>
                 </h3>
                 <div className="summary-list">
                   {summaryRows.rows.length === 0 ? (
                     <div className="empty">{str.empty_summary}</div>
                   ) : (
-                    summaryRows.rows.map(({ item, qty, portion, cal }) => {
+                    summaryRows.rows.map(({ item, qty, portion, cal, price }) => {
                       const photo = PHOTO_MAP[item.name_en];
                       return (
                         <div key={item.id} className="summary-item">
@@ -985,7 +1021,10 @@ export default function Calculator() {
                               <i className="ti ti-plus" aria-hidden="true" />
                             </button>
                           </div>
-                          <span className="gram" title={`${Math.round(portion)}g`}>{Math.round(cal)} cal</span>
+                          <div className="row-meta">
+                            <span className="gram" title={`${Math.round(portion)}g`}>{Math.round(cal)} cal</span>
+                            {price > 0 && <span className="row-price" title={`${price.toLocaleString("vi-VN")} đ`}>{formatPrice(price)}</span>}
+                          </div>
                           <button
                             className="remove"
                             aria-label={`Remove ${pickName(item, lang)}`}
