@@ -154,7 +154,7 @@ function suggestBowlName(
     if (base && topping) return "Tô " + n(base) + " " + n(topping);
     if (base) return "Tô " + n(base);
     if (protein) return "Tô " + n(protein);
-    return "Tô cua ban";
+    return "Tô của bạn";
   }
   if (base && protein) return n(base) + " + " + n(protein) + " bowl";
   if (base && dressing) return n(dressing) + " " + n(base).toLowerCase() + " bowl";
