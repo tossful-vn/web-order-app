@@ -1,11 +1,23 @@
+/* ── Tossful display font (brand-spec) — self-hosted ── */
+@font-face {
+  font-family: 'Refusit';
+  src: url('/fonts/RL-RefusitTest-Medium.otf') format('opentype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* ── Stamp card arc layout ── */
 .stamp-arc-wrap {
   position: relative;
   width: 100%;
   max-width: 400px;
   aspect-ratio: 400 / 300;
-  /* height is derived from aspect-ratio so the arc scales proportionally
-     and stays horizontally centered on narrow viewports (mobile). */
+  /* container-type: inline-size enables cqi (container query inline)
+     units below so stamp slots scale with the wrap. Prevents overlap
+     on narrow mobile (320–380px) — at 400px container, 13cqi = 52px;
+     at 320px, 13cqi ≈ 41.6px. Arc geometry stays balanced. */
+  container-type: inline-size;
 }
 
 /* ── Tossful semicircle wordmark above the bowl ── */
@@ -17,24 +29,34 @@
   pointer-events: none;
 }
 .stamp-wordmark text {
-  font-family: var(--font-fraunces), 'Fraunces', Georgia, serif;
-  font-style: italic;
-  font-weight: 400;
+  font-family: 'Refusit', var(--font-fraunces), 'Fraunces', Georgia, serif;
+  font-weight: 500;
   fill: #1F5E3A;
+  text-anchor: middle;
+  dominant-baseline: middle;
 }
 
 /* ── Individual stamp slot ── */
 .stamp-slot {
   position: absolute;
-  width: 52px;
-  height: 52px;
+  /* Slot scales with container width via cqi — 13cqi = 13% of container
+     inline size. Clamped 40–52px so it stays tap-target-friendly even on
+     very small screens and doesn't bloat on desktop. */
+  width: clamp(40px, 13cqi, 52px);
+  height: clamp(40px, 13cqi, 52px);
+  margin-left: clamp(-26px, -6.5cqi, -20px);
+  margin-top: clamp(-26px, -6.5cqi, -20px);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: border-color 0.3s ease, background-color 0.3s ease, box-shadow 0.3s ease, transform 0.15s ease;
-  margin-left: -26px;
-  margin-top: -26px;
+}
+
+/* Icons inside slots scale with the slot. */
+.stamp-slot > svg {
+  width: 62%;
+  height: 62%;
 }
 
 .stamp-slot.empty {

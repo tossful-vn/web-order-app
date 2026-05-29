@@ -130,24 +130,32 @@ function IngredientIcon({ ingredient, size = 28 }: { ingredient: IngredientKey; 
 }
 
 /* ── Bowl silhouette (sits behind the arc) ── */
-/* ── Tossful semicircle wordmark — sits below the stamps in a ∪ smile ── */
+/* ── Tossful wordmark — scattered letters in Refusit per IG profile inspo.
+     Each letter sits at a hand-tuned (x, y) within the 400×300 viewBox to
+     mimic the brand's playful display rhythm. Sits below the stamps. ── */
 function TossfulWordmark() {
+  // x, y in viewBox coords (viewBox 0 0 400 300). Stamps live in upper portion
+  // (y 56–160), so we use y 215–280 for the scattered wordmark.
+  const letters: Array<{ ch: string; x: number; y: number }> = [
+    { ch: "T", x:  68, y: 232 },
+    { ch: "O", x: 112, y: 268 },
+    { ch: "S", x: 156, y: 282 },
+    { ch: "S", x: 208, y: 290 },
+    { ch: "F", x: 252, y: 262 },
+    { ch: "U", x: 296, y: 280 },
+    { ch: "L", x: 340, y: 224 },
+  ];
   return (
     <svg
       viewBox="0 0 400 300"
       className="stamp-wordmark"
       aria-label="Tossful"
     >
-      <defs>
-        {/* Arc curving downward (∪ shape) — text follows the upper side */}
-        <path id="tossful-arc" d="M 60 220 Q 200 300 340 220" fill="none" />
-      </defs>
-      {/* Style matches header logo: Fraunces italic, kale-700, tightened tracking */}
-      <text fontSize="40" style={{ letterSpacing: "-0.5px" }}>
-        <textPath href="#tossful-arc" startOffset="50%" textAnchor="middle">
-          Tossful
-        </textPath>
-      </text>
+      {letters.map(({ ch, x, y }, i) => (
+        <text key={i} x={x} y={y} fontSize="40">
+          {ch}
+        </text>
+      ))}
     </svg>
   );
 }
