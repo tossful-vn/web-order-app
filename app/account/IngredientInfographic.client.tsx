@@ -23,6 +23,8 @@ const CATEGORY_LABELS: Record<string, { en: string; vi: string }> = {
 const STRINGS = {
   en: {
     about: "ABOUT",
+    nutrition_basis: "Per 100g raw, unless noted",
+
     why_good: "Why it's good for you",
     flavour: "Flavour profile",
     pairs: "Pairs well with",
@@ -38,6 +40,8 @@ const STRINGS = {
   },
   vi: {
     about: "VỀ",
+    nutrition_basis: "Mỗi 100g (tươi), trừ khi có ghi chú khác",
+
     why_good: "Vì sao tốt cho bạn",
     flavour: "Vị & cảm nhận",
     pairs: "Kết hợp ngon với",
@@ -397,6 +401,12 @@ export default function IngredientInfographic({ ingredientKey, stampNumber, lang
           </div>
 
           {/* Nutrition rings */}
+          <p
+            className="font-body text-kale-500 text-center"
+            style={{ fontSize: "11px", letterSpacing: "0.04em", marginTop: "-4px", marginBottom: "8px", fontStyle: "italic" }}
+          >
+            {s.nutrition_basis}
+          </p>
           <div className="nutri-rings-row">
             {data.nutrition.map((n, i) => (
               <NutritionRing key={i} {...n} />
