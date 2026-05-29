@@ -829,45 +829,6 @@ export default function Calculator() {
               <p>{str.hero_subtitle}</p>
             </div>
 
-            <div
-              className="infographic"
-              style={{ ["--bowl-label" as never]: `"${barLabel.replace(/"/g, '\\"')}"` }}
-            >
-              <div className="igrid">
-                {(Object.keys(DAILY) as MacroKey[]).map((key) => {
-                  const cfg = DAILY[key];
-                  const value = (totals as Record<string, number>)[key] ?? 0;
-                  const pct = cfg.daily > 0 ? Math.round((value / cfg.daily) * 100) : 0;
-                  const filled = (Math.min(pct, 100) / 100) * RING_C;
-                  const display = key === "cal" ? Math.round(value) : value.toFixed(1);
-                  return (
-                    <div key={key} className="ring-item" data-macro={key}>
-                      <div className="ring-wrap">
-                        <svg className="nring" viewBox="0 0 72 72">
-                          <circle className="bg" cx={36} cy={36} r={RING_R} />
-                          <circle
-                            className="fg"
-                            cx={36}
-                            cy={36}
-                            r={RING_R}
-                            style={{ strokeDasharray: `${filled} ${RING_C}` }}
-                          />
-                        </svg>
-                        <div className="ring-center">
-                          <div className="val">
-                            {display}
-                            {cfg.suffix}
-                          </div>
-                          <div className="lbl">
-                            {(str as unknown as Record<string, string>)[`macro_${key}`]}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
           </>
         )}
 
@@ -1187,6 +1148,46 @@ export default function Calculator() {
             </div>
             {saveError && <div className="save-error">{saveError}</div>}
             <div className="foot-note">{str.microcopy}</div>
+
+            <div
+              className="infographic"
+              style={{ ["--bowl-label" as never]: `"${barLabel.replace(/"/g, '\\"')}"` }}
+            >
+              <div className="igrid">
+                {(Object.keys(DAILY) as MacroKey[]).map((key) => {
+                  const cfg = DAILY[key];
+                  const value = (totals as Record<string, number>)[key] ?? 0;
+                  const pct = cfg.daily > 0 ? Math.round((value / cfg.daily) * 100) : 0;
+                  const filled = (Math.min(pct, 100) / 100) * RING_C;
+                  const display = key === "cal" ? Math.round(value) : value.toFixed(1);
+                  return (
+                    <div key={key} className="ring-item" data-macro={key}>
+                      <div className="ring-wrap">
+                        <svg className="nring" viewBox="0 0 72 72">
+                          <circle className="bg" cx={36} cy={36} r={RING_R} />
+                          <circle
+                            className="fg"
+                            cx={36}
+                            cy={36}
+                            r={RING_R}
+                            style={{ strokeDasharray: `${filled} ${RING_C}` }}
+                          />
+                        </svg>
+                        <div className="ring-center">
+                          <div className="val">
+                            {display}
+                            {cfg.suffix}
+                          </div>
+                          <div className="lbl">
+                            {(str as unknown as Record<string, string>)[`macro_${key}`]}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </>
         )}
       </div>
