@@ -44,15 +44,18 @@ const STRINGS = {
 /* ── Arc slot positions (in a 260x180 container) ── */
 // ∪ bowl shape — 400×260 container, 8 slots on a 160px-radius arc.
 // Center of imaginary circle: (200, 40). Sweep from 200° to 340° through bottom of bowl.
-const ARC_SLOTS: { left: number; top: number }[] = [
-  { left: 50,  top: 160 },  // slot 1 (left rim)
-  { left: 77,  top: 110 },  // slot 2
-  { left: 120, top: 75  },  // slot 3
-  { left: 172, top: 56  },  // slot 4 (apex left)
-  { left: 228, top: 56  },  // slot 5 (apex right)
-  { left: 280, top: 75  },  // slot 6
-  { left: 323, top: 110 },  // slot 7
-  { left: 350, top: 160 },  // slot 8 (right rim)
+/** Slot positions as percentages of a 400×300 reference canvas. The
+ *  container uses aspect-ratio 400/300 so these percentages translate
+ *  proportionally on any viewport width — keeps the arc centered. */
+const ARC_SLOTS: { left: string; top: string }[] = [
+  { left: "12.5%", top: "53.33%" },  // slot 1 (left rim)
+  { left: "19.25%", top: "36.67%" },  // slot 2
+  { left: "30%", top: "25%" },        // slot 3
+  { left: "43%", top: "18.67%" },     // slot 4 (apex left)
+  { left: "57%", top: "18.67%" },     // slot 5 (apex right)
+  { left: "70%", top: "25%" },        // slot 6
+  { left: "80.75%", top: "36.67%" },  // slot 7
+  { left: "87.5%", top: "53.33%" },   // slot 8 (right rim)
 ];
 
 /* ── Ingredient SVG icons ── */
@@ -338,8 +341,8 @@ export default function StampCardComponent({ card, entries, lang }: Props) {
                 key={i}
                 className={slotClass}
                 style={{
-                  left: `${pos.left}px`,
-                  top: `${pos.top}px`,
+                  left: pos.left,
+                  top: pos.top,
                   cursor: isClickable ? "pointer" : undefined,
                 }}
                 onClick={isClickable ? handleSlotClick : undefined}

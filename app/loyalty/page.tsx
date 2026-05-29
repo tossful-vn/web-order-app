@@ -4,14 +4,14 @@ import StampCard from "@/app/account/StampCard.client";
 
 const STRINGS = {
   en: {
-    page_title: "Loyalty",
+    page_title: "My Tossful",
     intro: "Earn a stamp every time you order. Collect 8 to redeem a free reward.",
-    metadata_title: "Loyalty · Tossful",
+    metadata_title: "My Tossful · Tossful",
   },
   vi: {
-    page_title: "Loyalty",
+    page_title: "My Tossful",
     intro: "Mỗi đơn hàng nhận một stamp. Sưu tầm đủ 8 để đổi phần thưởng miễn phí.",
-    metadata_title: "Loyalty · Tossful",
+    metadata_title: "My Tossful · Tossful",
   },
 } as const;
 

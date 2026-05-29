@@ -1,9 +1,11 @@
 /* ── Stamp card arc layout ── */
 .stamp-arc-wrap {
   position: relative;
-  width: 400px;
-  height: 300px;
-  max-width: 100%;
+  width: 100%;
+  max-width: 400px;
+  aspect-ratio: 400 / 300;
+  /* height is derived from aspect-ratio so the arc scales proportionally
+     and stays horizontally centered on narrow viewports (mobile). */
 }
 
 /* ── Tossful semicircle wordmark above the bowl ── */
