@@ -134,16 +134,18 @@ function IngredientIcon({ ingredient, size = 28 }: { ingredient: IngredientKey; 
      Each letter sits at a hand-tuned (x, y) within the 400×300 viewBox to
      mimic the brand's playful display rhythm. Sits below the stamps. ── */
 function TossfulWordmark() {
-  // x, y in viewBox coords (viewBox 0 0 400 300). Stamps live in upper portion
-  // (y 56–160), so we use y 215–280 for the scattered wordmark.
+  // x, y in viewBox coords (viewBox 0 0 400 300). Letters cluster in the
+  // middle 40% of the viewBox so the wordmark reads as one composition
+  // rather than a sprawl. y oscillates gently — the playful rhythm from
+  // the IG profile design without the letters flying apart.
   const letters: Array<{ ch: string; x: number; y: number }> = [
-    { ch: "T", x:  68, y: 232 },
-    { ch: "O", x: 112, y: 268 },
-    { ch: "S", x: 156, y: 282 },
-    { ch: "S", x: 208, y: 290 },
-    { ch: "F", x: 252, y: 262 },
-    { ch: "U", x: 296, y: 280 },
-    { ch: "L", x: 340, y: 224 },
+    { ch: "T", x: 142, y: 248 },
+    { ch: "O", x: 170, y: 262 },
+    { ch: "S", x: 196, y: 272 },
+    { ch: "S", x: 222, y: 278 },
+    { ch: "F", x: 250, y: 268 },
+    { ch: "U", x: 278, y: 256 },
+    { ch: "L", x: 308, y: 244 },
   ];
   return (
     <svg
@@ -152,7 +154,7 @@ function TossfulWordmark() {
       aria-label="Tossful"
     >
       {letters.map(({ ch, x, y }, i) => (
-        <text key={i} x={x} y={y} fontSize="40">
+        <text key={i} x={x} y={y} fontSize="30">
           {ch}
         </text>
       ))}

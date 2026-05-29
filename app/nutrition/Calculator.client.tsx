@@ -418,18 +418,21 @@ export default function Calculator() {
   }, [selected, items]);
 
   const summaryRows = useMemo(() => {
-    const rows: { item: Item; qty: number; portion: number }[] = [];
+    const rows: { item: Item; qty: number; portion: number; cal: number }[] = [];
     let totalG = 0;
+    let totalCal = 0;
     for (const cat of CATEGORY_ORDER) {
       for (const [id, qty] of Object.entries(selected)) {
         const item = items.find((i) => i.id === id);
         if (!item || item.category !== cat) continue;
         const portion = (item.tossful_portion_g ?? 0) * qty;
+        const cal = macrosFor(item).calories * qty;
         totalG += portion;
-        rows.push({ item, qty, portion });
+        totalCal += cal;
+        rows.push({ item, qty, portion, cal });
       }
     }
-    return { rows, totalG };
+    return { rows, totalG, totalCal };
   }, [selected, items]);
 
   // ===== Handlers =====
@@ -951,7 +954,7 @@ export default function Calculator() {
                   {summaryRows.rows.length === 0 ? (
                     <div className="empty">{str.empty_summary}</div>
                   ) : (
-                    summaryRows.rows.map(({ item, qty, portion }) => {
+                    summaryRows.rows.map(({ item, qty, portion, cal }) => {
                       const photo = PHOTO_MAP[item.name_en];
                       return (
                         <div key={item.id} className="summary-item">
@@ -982,7 +985,7 @@ export default function Calculator() {
                               <i className="ti ti-plus" aria-hidden="true" />
                             </button>
                           </div>
-                          <span className="gram">{Math.round(portion)}g</span>
+                          <span className="gram" title={`${Math.round(portion)}g`}>{Math.round(cal)} cal</span>
                           <button
                             className="remove"
                             aria-label={`Remove ${pickName(item, lang)}`}
