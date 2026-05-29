@@ -45,14 +45,14 @@ const STRINGS = {
 // ∪ bowl shape — 400×260 container, 8 slots on a 160px-radius arc.
 // Center of imaginary circle: (200, 40). Sweep from 200° to 340° through bottom of bowl.
 const ARC_SLOTS: { left: number; top: number }[] = [
-  { left: 50,  top: 94  },  // slot 1 (top-left rim)
-  { left: 77,  top: 143 },  // slot 2
-  { left: 120, top: 179 },  // slot 3
-  { left: 172, top: 198 },  // slot 4 (bottom-left)
-  { left: 228, top: 198 },  // slot 5 (bottom-right)
-  { left: 280, top: 179 },  // slot 6
-  { left: 323, top: 143 },  // slot 7
-  { left: 350, top: 94  },  // slot 8 (top-right rim)
+  { left: 50,  top: 160 },  // slot 1 (left rim)
+  { left: 77,  top: 110 },  // slot 2
+  { left: 120, top: 75  },  // slot 3
+  { left: 172, top: 56  },  // slot 4 (apex left)
+  { left: 228, top: 56  },  // slot 5 (apex right)
+  { left: 280, top: 75  },  // slot 6
+  { left: 323, top: 110 },  // slot 7
+  { left: 350, top: 160 },  // slot 8 (right rim)
 ];
 
 /* ── Ingredient SVG icons ── */
@@ -127,24 +127,43 @@ function IngredientIcon({ ingredient, size = 28 }: { ingredient: IngredientKey; 
 }
 
 /* ── Bowl silhouette (sits behind the arc) ── */
-function BowlSilhouette() {
+function HaloOutline() {
   return (
     <svg
-      viewBox="0 0 400 260"
+      viewBox="0 0 400 300"
       className="absolute inset-0 w-full h-full pointer-events-none"
       aria-hidden="true"
     >
-      {/* Bowl rim — straight line connecting slot 1 and slot 8 centers */}
-      <line x1="50" y1="94" x2="350" y2="94" stroke="#c9dac2" strokeWidth="1.5" strokeDasharray="4 4" opacity="0.5" />
-      {/* Bowl curve — arc through slot positions matching the 160-radius circle */}
+      {/* Dashed ∩ arc tracing the stamp slots — gentle visual anchor */}
       <path
-        d="M 50 94 A 160 160 0 0 0 350 94"
+        d="M 50 160 Q 200 0 350 160"
         fill="none"
         stroke="#c9dac2"
         strokeWidth="1.5"
         strokeDasharray="4 4"
         opacity="0.5"
       />
+    </svg>
+  );
+}
+
+/* ── Tossful semicircle wordmark — sits below the stamps in a ∪ smile ── */
+function TossfulWordmark() {
+  return (
+    <svg
+      viewBox="0 0 400 300"
+      className="stamp-wordmark"
+      aria-label="Tossful"
+    >
+      <defs>
+        {/* Arc curving downward (∪ shape) — text follows the upper side */}
+        <path id="tossful-arc" d="M 60 220 Q 200 300 340 220" fill="none" />
+      </defs>
+      <text fontSize="34">
+        <textPath href="#tossful-arc" startOffset="50%" textAnchor="middle">
+          Tossful
+        </textPath>
+      </text>
     </svg>
   );
 }
@@ -163,7 +182,7 @@ function ConfettiDots() {
   ];
   return (
     <svg
-      viewBox="0 0 260 180"
+      viewBox="0 0 400 300"
       className="absolute inset-0 w-full h-full pointer-events-none animate-[fadeIn_0.5s_ease-in]"
       aria-hidden="true"
     >
@@ -189,14 +208,6 @@ function getSlotIngredient(slotIndex: number, entries: StampEntry[]): Ingredient
     return (entry.ingredient_key as IngredientKey) || SLOT_INGREDIENTS[slotIndex];
   }
   return null;
-}
-
-/* ── Mascot opacity based on stamp count ── */
-function getMascotOpacity(stamps: number): number {
-  if (stamps >= 8) return 1.0;
-  if (stamps >= 7) return 0.45;
-  if (stamps >= 4) return 0.4;
-  return 0.15;
 }
 
 /* ── Main Component ── */
@@ -305,20 +316,10 @@ export default function StampCardComponent({ card, entries, lang }: Props) {
       {/* Arc layout */}
       <div className="flex justify-center mb-6">
         <div className="stamp-arc-wrap">
-          <BowlSilhouette />
+          <HaloOutline />
 
-          {/* Center mascot — sits inside the bowl, opacity scales with progress */}
-          <div
-            className="absolute pointer-events-none transition-opacity duration-500"
-            style={{
-              left: "50%",
-              top: "140px",
-              transform: "translate(-50%, -50%)",
-              opacity: getMascotOpacity(stampsCollected),
-            }}
-          >
-            <IngredientIcon ingredient="mascot" size={56} />
-          </div>
+          {/* Tossful wordmark — semicircle below the stamps */}
+          <TossfulWordmark />
 
           {/* Confetti when all 8 */}
           {stampsCollected >= 8 && <ConfettiDots />}
@@ -367,7 +368,7 @@ export default function StampCardComponent({ card, entries, lang }: Props) {
                 aria-label={isEmpty ? `Click to test stamp ${slotNum}` : isFilled ? `View ${filledIngredient} info` : undefined}
               >
                 {isFilled ? (
-                  <IngredientIcon ingredient={displayIngredient} size={26} />
+                  <IngredientIcon ingredient={displayIngredient} size={32} />
                 ) : (
                   <span className="text-kale-300 text-xs font-body">{slotNum}</span>
                 )}

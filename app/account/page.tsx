@@ -53,7 +53,32 @@ type BowlRow = {
   fibre_g: number | null;
   is_favourite: boolean | null;
   created_at: string;
+  composition: {
+    base?: { name?: string } | null;
+    cot?: { name?: string } | null;
+    toppings?: Array<{ name?: string }> | null;
+    proteins?: Array<{ name?: string }> | null;
+    dressing?: { name?: string } | null;
+    xot?: { name?: string } | null;
+    fixed?: Array<{ name?: string }> | null;
+  } | null;
 };
+
+function extractIngredientNames(comp: BowlRow["composition"]): string[] {
+  if (!comp) return [];
+  const names: string[] = [];
+  const push = (n?: string | null) => {
+    if (n && typeof n === "string") names.push(n.trim());
+  };
+  push(comp.base?.name);
+  push(comp.cot?.name);
+  (comp.toppings ?? []).forEach((t) => push(t?.name));
+  (comp.proteins ?? []).forEach((p) => push(p?.name));
+  (comp.fixed ?? []).forEach((f) => push(f?.name));
+  push(comp.dressing?.name);
+  push(comp.xot?.name);
+  return Array.from(new Set(names.filter(Boolean)));
+}
 
 export default async function AccountPage() {
   const lang = getServerLang();
@@ -62,7 +87,7 @@ export default async function AccountPage() {
   // Favourites first, then newest. is_favourite desc puts true (1) before false (0).
   const { data: bowls } = await supabase
     .from("saved_bowls")
-    .select("id, name, kcal, protein_g, fat_g, carbs_g, fibre_g, is_favourite, created_at")
+    .select("id, name, kcal, protein_g, fat_g, carbs_g, fibre_g, is_favourite, created_at, composition")
     .order("is_favourite", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(40);
@@ -112,15 +137,25 @@ export default async function AccountPage() {
               fibre: Number(b.fibre_g ?? 0),
             };
             const isFav = b.is_favourite === true;
+            const ingredients = extractIngredientNames(b.composition);
+            const ingredientLine = ingredients.join(", ");
             return (
               <li key={b.id} className="relative">
                 <Link
                   href={`/account/bowls/${b.id}`}
-                  className="block border border-kale-100 rounded-xl p-4 hover:border-kale-300 hover:shadow-sm transition h-full"
+                  className="block border border-kale-100 rounded-xl p-3 sm:p-4 hover:border-kale-300 hover:shadow-sm transition h-full"
                 >
-                  <div className="font-medium text-kale-700 mb-3 line-clamp-1 pr-12">
+                  <div className="font-medium text-kale-700 mb-1 line-clamp-1 pr-12">
                     {b.name}
                   </div>
+                  {ingredientLine && (
+                    <div
+                      className="text-[11px] sm:text-xs text-kale-500 mb-3 leading-snug"
+                      title={ingredientLine}
+                    >
+                      {ingredientLine}
+                    </div>
+                  )}
                   <MacroPanel
                     totals={totals}
                     label={s.panel_label}
@@ -152,7 +187,7 @@ export default async function AccountPage() {
                     {s.section_must_try}
                     <span className="text-sm font-body text-kale-500 not-italic">({favs.length})</span>
                   </h2>
-                  <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <ul className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                     {favs.map(renderCard)}
                   </ul>
                 </section>
@@ -162,7 +197,7 @@ export default async function AccountPage() {
                   <h2 className="font-display text-2xl text-kale-700 mb-4">
                     {favs.length > 0 ? s.section_saved_bowls : s.title}
                   </h2>
-                  <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <ul className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                     {rest.map(renderCard)}
                   </ul>
                 </section>

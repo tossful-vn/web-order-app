@@ -2,22 +2,38 @@
 .stamp-arc-wrap {
   position: relative;
   width: 400px;
-  height: 260px;
+  height: 300px;
   max-width: 100%;
+}
+
+/* ── Tossful semicircle wordmark above the bowl ── */
+.stamp-wordmark {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.stamp-wordmark text {
+  font-family: var(--font-fraunces), 'Fraunces', Georgia, serif;
+  font-style: italic;
+  font-weight: 400;
+  fill: #0F563D;
+  letter-spacing: 0.18em;
 }
 
 /* ── Individual stamp slot ── */
 .stamp-slot {
   position: absolute;
-  width: 44px;
-  height: 44px;
+  width: 52px;
+  height: 52px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: border-color 0.3s ease, background-color 0.3s ease, box-shadow 0.3s ease, transform 0.15s ease;
-  margin-left: -22px;
-  margin-top: -22px;
+  margin-left: -26px;
+  margin-top: -26px;
 }
 
 .stamp-slot.empty {
@@ -339,4 +355,9 @@
 @keyframes fade-in {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+
+/* ── Wider modal for Screen C readability bump (TSK-95) ── */
+.ingredient-modal {
+  max-width: 420px;
 }

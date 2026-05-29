@@ -29,6 +29,10 @@ const STRINGS = {
     grown: "How it's grown",
     fun_fact: "Fun fact",
     source: "Source",
+    sources_heading: "Sources",
+    sources_body:
+      "Nutrition: USDA FoodData Central · Health benefits: peer-reviewed nutrition journals · Growing & seasonality: Vietnam Ministry of Agriculture · Flavour & pairings: Tossful R&D.",
+    brand_sign_off: "Curated by Tossful — a bowl for everyone.",
     back: "Nice! Back to my card",
     close: "Close",
   },
@@ -40,6 +44,10 @@ const STRINGS = {
     grown: "Nguồn & cách trồng",
     fun_fact: "Bạn có biết",
     source: "Nguồn",
+    sources_heading: "Nguồn dữ liệu",
+    sources_body:
+      "Dinh dưỡng: USDA FoodData Central · Lợi ích sức khỏe: tạp chí dinh dưỡng đã thẩm định · Mùa vụ & cách trồng: Bộ Nông nghiệp Việt Nam · Vị & kết hợp: Tossful R&D.",
+    brand_sign_off: "Tổng hợp bởi Tossful — một bowl cho mọi người.",
     back: "Tuyệt! Quay lại thẻ stamp",
     close: "Đóng",
   },
@@ -134,13 +142,13 @@ function NutritionRing({
   color: string;
   ratio: number;
 }) {
-  const size = 40;
-  const stroke = 3.5;
+  const size = 52;
+  const stroke = 4;
   const radius = (size - stroke) / 2;
   const circ = 2 * Math.PI * radius;
   const filled = Math.max(0, Math.min(1, ratio)) * circ;
   return (
-    <div className="flex flex-col items-center" style={{ width: 56 }}>
+    <div className="flex flex-col items-center" style={{ width: 64 }}>
       <div className="relative" style={{ width: size, height: size }}>
         <svg width={size} height={size} aria-hidden="true">
           <circle
@@ -165,13 +173,13 @@ function NutritionRing({
           />
         </svg>
         <div
-          className="absolute inset-0 flex items-center justify-center text-[9px] font-body text-ink"
+          className="absolute inset-0 flex items-center justify-center text-[11px] font-body text-ink"
           style={{ lineHeight: 1 }}
         >
           {value}
         </div>
       </div>
-      <span className="text-[8px] font-body text-kale-500 mt-1 uppercase tracking-wide">
+      <span className="text-[10px] font-body text-kale-500 mt-1 uppercase tracking-wide">
         {label}
       </span>
     </div>
@@ -277,7 +285,7 @@ export default function IngredientInfographic({ ingredientKey, stampNumber, lang
             <span
               className="inline-block font-body uppercase"
               style={{
-                fontSize: "9px",
+                fontSize: "11px",
                 letterSpacing: "0.12em",
                 color: "#faf7f0",
                 background: "rgba(250, 247, 240, 0.14)",
@@ -287,21 +295,21 @@ export default function IngredientInfographic({ ingredientKey, stampNumber, lang
             >
               {categoryLabel}
             </span>
-            <span className="font-body" style={{ fontSize: "9px", color: "#a4c098", letterSpacing: "0.04em" }}>
+            <span className="font-body" style={{ fontSize: "11px", color: "#a4c098", letterSpacing: "0.04em" }}>
               #{stampNumber}
             </span>
           </div>
 
           <h3
             className="font-display italic"
-            style={{ fontSize: "16px", color: "#faf7f0", lineHeight: 1.25, marginBottom: "8px" }}
+            style={{ fontSize: "20px", color: "#faf7f0", lineHeight: 1.25, marginBottom: "10px" }}
           >
             {surprise.title}
           </h3>
 
           <p
             className="font-body"
-            style={{ fontSize: "11px", color: "#c9dac2", lineHeight: 1.55 }}
+            style={{ fontSize: "13px", color: "#c9dac2", lineHeight: 1.6 }}
           >
             {renderBody(surprise.body)}
           </p>
@@ -320,7 +328,7 @@ export default function IngredientInfographic({ ingredientKey, stampNumber, lang
             <ClockIcon />
             <span
               className="font-body"
-              style={{ fontSize: "9px", color: "#a4c098", letterSpacing: "0.02em" }}
+              style={{ fontSize: "11px", color: "#a4c098", letterSpacing: "0.02em" }}
             >
               {s.source}: {surprise.source}
             </span>
@@ -354,32 +362,32 @@ export default function IngredientInfographic({ ingredientKey, stampNumber, lang
         {/* ── Bottom zone: reference (cream) ── */}
         <div>
           {/* Hero */}
-          <div className="flex flex-col items-center pt-2 pb-3 px-4">
+          <div className="flex flex-col items-center pt-3 pb-4 px-4">
             <div
-              className="rounded-full flex items-center justify-center mb-2"
+              className="rounded-full flex items-center justify-center mb-3"
               style={{
-                width: 56,
-                height: 56,
+                width: 72,
+                height: 72,
                 background: "#f3f7f1",
               }}
             >
-              <IngredientIcon ingredient={ingredientKey} size={36} />
+              <IngredientIcon ingredient={ingredientKey} size={48} />
             </div>
             <h2
               className="font-display italic text-kale-700"
-              style={{ fontSize: "18px", lineHeight: 1.2, marginBottom: 2 }}
+              style={{ fontSize: "22px", lineHeight: 1.2, marginBottom: 4 }}
             >
               {name}
             </h2>
             <p
               className="font-body text-kale-500"
-              style={{ fontSize: "11px", marginBottom: 4 }}
+              style={{ fontSize: "13px", marginBottom: 6 }}
             >
               {altName}
             </p>
             <p
               className="font-body text-kale-600 text-center"
-              style={{ fontSize: "11px", fontStyle: "italic" }}
+              style={{ fontSize: "13px", fontStyle: "italic" }}
             >
               {tagline}
             </p>
@@ -400,14 +408,14 @@ export default function IngredientInfographic({ ingredientKey, stampNumber, lang
               </span>
               <h4
                 className="font-display italic text-kale-700"
-                style={{ fontSize: "12px", lineHeight: 1.3 }}
+                style={{ fontSize: "14px", lineHeight: 1.3 }}
               >
                 {s.why_good}
               </h4>
             </div>
             <p
               className="font-body text-ink"
-              style={{ fontSize: "11px", lineHeight: 1.55, paddingLeft: "26px" }}
+              style={{ fontSize: "13px", lineHeight: 1.6, paddingLeft: "28px" }}
             >
               {benefits}
             </p>
@@ -421,14 +429,14 @@ export default function IngredientInfographic({ ingredientKey, stampNumber, lang
               </span>
               <h4
                 className="font-display italic text-kale-700"
-                style={{ fontSize: "12px", lineHeight: 1.3 }}
+                style={{ fontSize: "14px", lineHeight: 1.3 }}
               >
                 {s.flavour}
               </h4>
             </div>
             <p
               className="font-body text-ink"
-              style={{ fontSize: "11px", lineHeight: 1.55, paddingLeft: "26px" }}
+              style={{ fontSize: "13px", lineHeight: 1.6, paddingLeft: "28px" }}
             >
               {flavour}
             </p>
@@ -442,7 +450,7 @@ export default function IngredientInfographic({ ingredientKey, stampNumber, lang
               </span>
               <h4
                 className="font-display italic text-kale-700"
-                style={{ fontSize: "12px", lineHeight: 1.3 }}
+                style={{ fontSize: "14px", lineHeight: 1.3 }}
               >
                 {s.pairs}
               </h4>
@@ -465,14 +473,14 @@ export default function IngredientInfographic({ ingredientKey, stampNumber, lang
               </span>
               <h4
                 className="font-display italic text-kale-700"
-                style={{ fontSize: "12px", lineHeight: 1.3 }}
+                style={{ fontSize: "14px", lineHeight: 1.3 }}
               >
                 {s.grown}
               </h4>
             </div>
             <p
               className="font-body text-ink"
-              style={{ fontSize: "11px", lineHeight: 1.55, paddingLeft: "26px" }}
+              style={{ fontSize: "13px", lineHeight: 1.6, paddingLeft: "28px" }}
             >
               {growing}
             </p>
@@ -484,20 +492,57 @@ export default function IngredientInfographic({ ingredientKey, stampNumber, lang
               <span className="fun-fact-badge">!</span>
               <p
                 className="font-body text-kale-700"
-                style={{ fontSize: "10.5px", lineHeight: 1.5, fontStyle: "italic" }}
+                style={{ fontSize: "13px", lineHeight: 1.55, fontStyle: "italic" }}
               >
                 {funFact}
               </p>
             </div>
           )}
 
+          {/* Sources — always-on attribution */}
+          <div className="info-section">
+            <div className="flex items-start gap-2 mb-1">
+              <span className="info-icon-box">
+                <ClockIcon />
+              </span>
+              <h4
+                className="font-display italic text-kale-700"
+                style={{ fontSize: "14px", lineHeight: 1.3 }}
+              >
+                {s.sources_heading}
+              </h4>
+            </div>
+            <p
+              className="font-body text-kale-600"
+              style={{ fontSize: "11px", lineHeight: 1.55, paddingLeft: "28px" }}
+            >
+              {s.sources_body}
+            </p>
+          </div>
+
+          {/* Tossful mascot sign-off */}
+          <div className="flex flex-col items-center gap-2 px-4 pt-4 pb-2">
+            <img
+              src="/brand/tossful-mascot.png"
+              alt=""
+              aria-hidden="true"
+              className="w-[88px] h-auto select-none"
+            />
+            <p
+              className="font-display italic text-kale-600 text-center"
+              style={{ fontSize: "12px", lineHeight: 1.4 }}
+            >
+              {s.brand_sign_off}
+            </p>
+          </div>
+
           {/* Back button */}
-          <div className="px-4 py-4">
+          <div className="px-4 pt-3 pb-4">
             <button
               type="button"
               onClick={onClose}
-              className="w-full bg-kale-700 text-white py-2.5 rounded-lg hover:bg-kale-800 transition font-body"
-              style={{ fontSize: "12px" }}
+              className="w-full bg-kale-700 text-white py-3 rounded-lg hover:bg-kale-800 transition font-body"
+              style={{ fontSize: "14px" }}
             >
               {s.back}
             </button>
