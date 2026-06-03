@@ -45,8 +45,8 @@ const EN = {
 };
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 import { useLang, persistLang, type Lang } from "@/lib/lang";
 import { signOut } from "@/lib/auth/actions";
 
@@ -55,8 +55,25 @@ type Props = {
   children: React.ReactNode;
 };
 
-export default function AppShell({ user, children }: Props) {
+// useSearchParams() (read in AppShellInner for brand-site mode) requires a
+// Suspense boundary. AppShell lives in the route LAYOUT, outside any page-level
+// loading.tsx boundary, so it must provide its own. TSK-122.
+export default function AppShell(props: Props) {
+  return (
+    <Suspense fallback={<>{props.children}</>}>
+      <AppShellInner {...props} />
+    </Suspense>
+  );
+}
+
+function AppShellInner({ user, children }: Props) {
   const pathname = usePathname() ?? "";
+  const searchParams = useSearchParams();
+  // Brand-site mode: tossful.com/calculator proxies /nutrition with ?src=brand-site.
+  // Phase 1 is calc-only + no auth, so hide every nav item / affordance the
+  // customer can't use yet (My week, Saved bowls, My Tossful, Sign in, Feedback).
+  // Direct web-order-app visitors (no param) keep the full nav. TSK-122.
+  const isBrandSite = searchParams?.get("src") === "brand-site";
   const [lang] = useLang();
   const [open, setOpen] = useState(false);
   const str = lang === "vi" ? VI : EN;
@@ -76,12 +93,14 @@ export default function AppShell({ user, children }: Props) {
     return () => { document.body.style.overflow = ""; };
   }, [open]);
 
-  const navLinks = [
-    { href: "/nutrition", label: str.nav_calc, active: isCalc },
-    { href: "/byw", label: str.nav_week, active: isWeek },
-    { href: "/account", label: str.nav_bowls, active: isBowls },
-    { href: "/loyalty", label: str.nav_loyalty, active: isLoyalty },
-  ];
+  const navLinks = isBrandSite
+    ? [{ href: "/nutrition", label: str.nav_calc, active: isCalc }]
+    : [
+        { href: "/nutrition", label: str.nav_calc, active: isCalc },
+        { href: "/byw", label: str.nav_week, active: isWeek },
+        { href: "/account", label: str.nav_bowls, active: isBowls },
+        { href: "/loyalty", label: str.nav_loyalty, active: isLoyalty },
+      ];
 
   return (
     <>
@@ -165,7 +184,7 @@ export default function AppShell({ user, children }: Props) {
             ) : (
               <>
                 <div className="text-kale-700 font-medium text-sm">{str.drawer_guest}</div>
-                <div className="text-[11px]">{str.drawer_guest_sub}</div>
+                {!isBrandSite && <div className="text-[11px]">{str.drawer_guest_sub}</div>}
               </>
             )}
           </div>
@@ -237,21 +256,26 @@ export default function AppShell({ user, children }: Props) {
             </div>
           </div>
 
-          <div className="border-t border-kale-100 my-2" />
+          {/* Help / Feedback — hidden in brand-site (Phase 2 feature). TSK-122. */}
+          {!isBrandSite && (
+            <>
+              <div className="border-t border-kale-100 my-2" />
+              <div className="text-[10px] text-kale-400 uppercase tracking-widest px-5 pt-3 pb-2 font-medium">
+                {str.help_label}
+              </div>
+              <Link
+                href="/feedback"
+                className="flex items-center gap-3 px-5 py-3 text-sm text-ink hover:bg-kale-50 active:bg-kale-100"
+              >
+                <i className="ti ti-message-circle text-xl text-kale-700 w-6 text-center" />
+                <span className="flex-1">{str.feedback}</span>
+                <i className="ti ti-chevron-right text-kale-300" />
+              </Link>
+            </>
+          )}
 
-          <div className="text-[10px] text-kale-400 uppercase tracking-widest px-5 pt-3 pb-2 font-medium">
-            {str.help_label}
-          </div>
-          <Link
-            href="/feedback"
-            className="flex items-center gap-3 px-5 py-3 text-sm text-ink hover:bg-kale-50 active:bg-kale-100"
-          >
-            <i className="ti ti-message-circle text-xl text-kale-700 w-6 text-center" />
-            <span className="flex-1">{str.feedback}</span>
-            <i className="ti ti-chevron-right text-kale-300" />
-          </Link>
-
-          {!user && (
+          {/* Sign in — hidden in brand-site (Phase 1 has no auth). TSK-122. */}
+          {!user && !isBrandSite && (
             <>
               <div className="border-t border-kale-100 my-2" />
               <Link

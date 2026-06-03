@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { saveBowl } from "@/lib/bowls/actions";
 import type { BowlComposition } from "@/lib/types/database";
@@ -332,6 +332,12 @@ export default function Calculator() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const router = useRouter();
+
+  // Brand-site mode: tossful.com/calculator proxies this page with ?src=brand-site.
+  // Phase 1 is calc-only + no auth, so hide save/account affordances. Absent the
+  // param (direct web-order-app visitors) the full experience stays. See TSK-122.
+  const searchParams = useSearchParams();
+  const isBrandSite = searchParams?.get("src") === "brand-site";
 
   // Restore hydration flag after first render (used by other effects)
   useEffect(() => { setHydrated(true); }, []);
@@ -1114,37 +1120,43 @@ export default function Calculator() {
         {/* Bowl-building chrome footer — only shown in edit view */}
         {view === "edit" && (
           <>
-            <div className="name-row">
-              <label className="name-label" htmlFor="bowl-name-input">
-                {str.bowl_name_label}
-              </label>
-              <input
-                id="bowl-name-input"
-                className="name-input"
-                type="text"
-                maxLength={60}
-                placeholder={str.bowl_name_placeholder}
-                value={bowlName}
-                onChange={(e) => {
-                  setBowlName(e.target.value);
-                  setBowlNameCustom(true);
-                }}
-              />
-              {!bowlNameCustom && bowlName && (
-                <div className="name-suggest-note">{str.bowl_name_hint}</div>
-              )}
-            </div>
+            {/* Bowl naming is part of the save affordance — hidden in brand-site
+                (Phase 1, no auth, nothing to save to). TSK-122. */}
+            {!isBrandSite && (
+              <div className="name-row">
+                <label className="name-label" htmlFor="bowl-name-input">
+                  {str.bowl_name_label}
+                </label>
+                <input
+                  id="bowl-name-input"
+                  className="name-input"
+                  type="text"
+                  maxLength={60}
+                  placeholder={str.bowl_name_placeholder}
+                  value={bowlName}
+                  onChange={(e) => {
+                    setBowlName(e.target.value);
+                    setBowlNameCustom(true);
+                  }}
+                />
+                {!bowlNameCustom && bowlName && (
+                  <div className="name-suggest-note">{str.bowl_name_hint}</div>
+                )}
+              </div>
+            )}
             <div className="foot">
               <button className="btn ghost" onClick={() => { reset(); setBowlNameCustom(false); }}>
                 {str.reset}
               </button>
-              <button
-                className="btn kale"
-                onClick={handleSave}
-                disabled={saving || Object.keys(selected).length === 0}
-              >
-                {saving ? str.saving : str.save_bowl}
-              </button>
+              {!isBrandSite && (
+                <button
+                  className="btn kale"
+                  onClick={handleSave}
+                  disabled={saving || Object.keys(selected).length === 0}
+                >
+                  {saving ? str.saving : str.save_bowl}
+                </button>
+              )}
             </div>
             {saveError && <div className="save-error">{saveError}</div>}
             <div className="foot-note">{str.microcopy}</div>
