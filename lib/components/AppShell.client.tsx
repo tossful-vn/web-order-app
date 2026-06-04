@@ -111,17 +111,35 @@ function AppShellInner({ user, children }: Props) {
       />
 
       <header className="bg-white border-b border-kale-100 sticky top-0 z-30">
-        <div className="px-3 py-2.5 flex items-center gap-2 max-w-5xl mx-auto">
+        {/* Brand-site mode mirrors tossful.com's Sweetgreen nav: nav LEFT, logo
+            CENTER, hamburger RIGHT (1fr auto 1fr keeps the logo centered). Direct
+            visitors keep the default logo-left / nav-center / hamburger-right flex
+            row. TSK-125. */}
+        <div
+          className={
+            "px-3 py-2.5 items-center gap-2 max-w-5xl mx-auto " +
+            (isBrandSite ? "grid grid-cols-[1fr_auto_1fr]" : "flex")
+          }
+        >
           <Link
             href="/"
             prefetch
-            className="font-display italic text-kale-700 text-xl shrink-0 leading-none"
+            className={
+              "font-display italic text-kale-700 text-xl shrink-0 leading-none " +
+              (isBrandSite ? "col-start-2 row-start-1 justify-self-center" : "")
+            }
             style={{ letterSpacing: "-0.2px" }}
           >
             Tossful
           </Link>
-          <nav className="flex-1 flex items-center justify-center gap-3 sm:gap-5 overflow-x-auto"
-               style={{ scrollbarWidth: "none" }}>
+          <nav
+            className={
+              isBrandSite
+                ? "col-start-1 row-start-1 justify-self-start flex items-center gap-3"
+                : "flex-1 flex items-center justify-center gap-3 sm:gap-5 overflow-x-auto"
+            }
+            style={{ scrollbarWidth: "none" }}
+          >
             {navLinks.map((l) => (
               <Link
                 key={l.href}
@@ -141,7 +159,10 @@ function AppShellInner({ user, children }: Props) {
           <button
             type="button"
             onClick={() => setOpen(true)}
-            className="w-9 h-9 rounded-full bg-kale-50 text-kale-700 flex items-center justify-center shrink-0"
+            className={
+              "w-9 h-9 rounded-full bg-kale-50 text-kale-700 flex items-center justify-center shrink-0 " +
+              (isBrandSite ? "col-start-3 row-start-1 justify-self-end" : "")
+            }
             aria-label={str.menu_label}
           >
             <i className="ti ti-menu-2 text-xl" />
