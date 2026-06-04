@@ -5,11 +5,23 @@
  * For now, hand-rolled keeps the dev loop simple.
  */
 
+/**
+ * City code for store selection + city-based pricing (D8).
+ * Drives which items.price_vnd_* column the calculator reads
+ * (price_vnd_hn / price_vnd_hcm).
+ */
+export type StoreCity = "HN" | "HCM";
+
+/** profiles.role — gates /staff/orders-board access (D3). */
+export type ProfileRole = "customer" | "staff" | "admin";
+
 export type Profile = {
   id: string;
   display_name: string | null;
   contact_phone: string | null;
-  preferred_store: "HN" | "SG";
+  preferred_store: StoreCity;
+  role: ProfileRole;
+  zalo_oa_subscribed: boolean;
   locale: string;
   created_at: string;
   updated_at: string;
@@ -150,4 +162,65 @@ export type WeekItem = {
   custom_fibre_g: number | null;
   sort_order: number;
   created_at: string;
+};
+
+/**
+ * Phase 1.5 Sprint 1 (TSK-117) — login + Saved bowls + Plan my Week + Path-1
+ * order queue. Hand-rolled to match this file's convention (the project does
+ * not commit generated Supabase types). These mirror the byw_plans /
+ * orders_pending table rows exactly. Types live here (not in lib/byw.ts)
+ * because that module is "use server" and may only export async functions.
+ */
+
+/** Weekday keys for a plan / delivery prefs. Mon–Fri (D7 planner). */
+export type DayKey = "mon" | "tue" | "wed" | "thu" | "fri";
+
+/**
+ * byw_plans.slots — maps each weekday to a saved_bowls.id (or null for an
+ * unplanned day). Stored as freeform jsonb and validated app-side so the
+ * planner can evolve days/keys without a migration.
+ */
+export type BywSlots = Partial<Record<DayKey, string | null>>;
+
+/** Row of public.byw_plans. */
+export type BywPlan = {
+  id: string;
+  user_id: string;
+  week_start_date: string; // ISO date — Monday of the planned week
+  slots: BywSlots;
+  created_at: string;
+  updated_at: string;
+};
+
+/** public.order_status enum. */
+export type OrderStatus =
+  | "pending"
+  | "confirmed"
+  | "sent_to_ipos"
+  | "fulfilled"
+  | "cancelled"
+  | "rejected";
+
+/**
+ * orders_pending.delivery_prefs — freeform jsonb, validated app-side.
+ * time_slots/notes_per_day are keyed by weekday.
+ */
+export type DeliveryPrefs = {
+  address_id: string | null;
+  time_slots: Partial<Record<DayKey, string>>;
+  notes_per_day: Partial<Record<DayKey, string>>;
+};
+
+/** Row of public.orders_pending. */
+export type OrderPending = {
+  id: string;
+  plan_id: string;
+  user_id: string;
+  status: OrderStatus;
+  delivery_prefs: DeliveryPrefs;
+  reject_reason: string | null;
+  staff_confirmed_by: string | null;
+  staff_confirmed_at: string | null;
+  created_at: string;
+  updated_at: string;
 };
