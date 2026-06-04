@@ -85,7 +85,7 @@ export default async function ProfilePage() {
         <div>
           <label className="block text-sm font-medium text-kale-700 mb-2">{s.store_label}</label>
           <div className="grid grid-cols-2 gap-3">
-            {(["HN", "SG"] as const).map((st) => (
+            {(["HN", "HCM"] as const).map((st) => (
               <label key={st} className="flex items-center gap-3 border border-kale-200 rounded-lg p-3 cursor-pointer">
                 <input
                   type="radio"

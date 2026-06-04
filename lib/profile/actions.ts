@@ -17,8 +17,8 @@ export async function updateProfile(formData: FormData): Promise<void> {
   const display_name = String(formData.get("display_name") ?? "").trim() || null;
   const contact_phone = String(formData.get("contact_phone") ?? "").trim() || null;
   const preferred_store_raw = String(formData.get("preferred_store") ?? "HN");
-  const preferred_store: "HN" | "SG" =
-    preferred_store_raw === "SG" ? "SG" : "HN";
+  const preferred_store: "HN" | "HCM" =
+    preferred_store_raw === "HCM" ? "HCM" : "HN";
 
   const { error } = await supabase
     .from("profiles")
