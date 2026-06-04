@@ -1049,7 +1049,10 @@ export default function Calculator() {
                 <h3>
                   {str.your_bowl}
                   <span className="total-g">
-                    {summaryRows.totalPrice > 0 && (
+                    {/* Prices are store-specific (HN vs HCM); the brand site is
+                        store-agnostic in Phase 1, so hide every price display when
+                        proxied via ?src=brand-site. Macros/grams stay. TSK-124. */}
+                    {!isBrandSite && summaryRows.totalPrice > 0 && (
                       <span className="total-price" title={summaryRows.isSignaturePrice ? "Giá signature (đã bao gồm ưu đãi combo) · Signature price (combo discount applied)" : undefined}>
                         {formatPrice(summaryRows.totalPrice)}
                         {summaryRows.isSignaturePrice && (
@@ -1097,7 +1100,7 @@ export default function Calculator() {
                           </div>
                           <div className="row-meta">
                             <span className="gram" title={`${Math.round(portion)}g`}>{Math.round(cal)} cal</span>
-                            {price > 0 && <span className="row-price" title={`${price.toLocaleString("vi-VN")} đ`}>{formatPrice(price)}</span>}
+                            {!isBrandSite && price > 0 && <span className="row-price" title={`${price.toLocaleString("vi-VN")} đ`}>{formatPrice(price)}</span>}
                           </div>
                           <button
                             className="remove"
