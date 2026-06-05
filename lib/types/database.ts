@@ -18,6 +18,12 @@ export type ProfileRole = "customer" | "staff" | "admin";
 export type Profile = {
   id: string;
   display_name: string | null;
+  /**
+   * Canonical login identity + iPOS member lookup key (TSK-127). VN format
+   * 0xxxxxxxxx, UNIQUE. Distinct from contact_phone (delivery/order phone).
+   * Nullable so pre-TSK-127 accounts don't break; new signups always set it.
+   */
+  phone: string | null;
   contact_phone: string | null;
   preferred_store: StoreCity;
   role: ProfileRole;
@@ -25,6 +31,20 @@ export type Profile = {
   locale: string;
   created_at: string;
   updated_at: string;
+};
+
+/** phone_otp_pending.purpose — OTP verifies phone ownership (TSK-127). */
+export type OtpPurpose = "signup" | "reset";
+
+/** Row of public.phone_otp_pending. Service-role only (RLS on, no policies). */
+export type PhoneOtpPending = {
+  id: string;
+  phone: string;
+  otp_hash: string;
+  purpose: OtpPurpose;
+  expires_at: string;
+  attempts: number;
+  created_at: string;
 };
 
 export type SavedBowl = {

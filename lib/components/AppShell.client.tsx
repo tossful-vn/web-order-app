@@ -93,14 +93,19 @@ function AppShellInner({ user, children }: Props) {
     return () => { document.body.style.overflow = ""; };
   }, [open]);
 
+  // Phase 1.5 (TSK-127) unhid auth + Saved bowls + My week on the brand-site
+  // proxy. Only Phase-2-only routes stay hidden there now — currently just
+  // /loyalty (My Tossful). Direct visitors always see everything.
+  const isPhase2Only = (href: string) => href === "/loyalty";
+  const allLinks = [
+    { href: "/nutrition", label: str.nav_calc, active: isCalc },
+    { href: "/byw", label: str.nav_week, active: isWeek },
+    { href: "/account", label: str.nav_bowls, active: isBowls },
+    { href: "/loyalty", label: str.nav_loyalty, active: isLoyalty },
+  ];
   const navLinks = isBrandSite
-    ? [{ href: "/nutrition", label: str.nav_calc, active: isCalc }]
-    : [
-        { href: "/nutrition", label: str.nav_calc, active: isCalc },
-        { href: "/byw", label: str.nav_week, active: isWeek },
-        { href: "/account", label: str.nav_bowls, active: isBowls },
-        { href: "/loyalty", label: str.nav_loyalty, active: isLoyalty },
-      ];
+    ? allLinks.filter((l) => !isPhase2Only(l.href))
+    : allLinks;
 
   return (
     <>
@@ -205,7 +210,7 @@ function AppShellInner({ user, children }: Props) {
             ) : (
               <>
                 <div className="text-kale-700 font-medium text-sm">{str.drawer_guest}</div>
-                {!isBrandSite && <div className="text-[11px]">{str.drawer_guest_sub}</div>}
+                <div className="text-[11px]">{str.drawer_guest_sub}</div>
               </>
             )}
           </div>
@@ -277,26 +282,24 @@ function AppShellInner({ user, children }: Props) {
             </div>
           </div>
 
-          {/* Help / Feedback — hidden in brand-site (Phase 2 feature). TSK-122. */}
-          {!isBrandSite && (
-            <>
-              <div className="border-t border-kale-100 my-2" />
-              <div className="text-[10px] text-kale-400 uppercase tracking-widest px-5 pt-3 pb-2 font-medium">
-                {str.help_label}
-              </div>
-              <Link
-                href="/feedback"
-                className="flex items-center gap-3 px-5 py-3 text-sm text-ink hover:bg-kale-50 active:bg-kale-100"
-              >
-                <i className="ti ti-message-circle text-xl text-kale-700 w-6 text-center" />
-                <span className="flex-1">{str.feedback}</span>
-                <i className="ti ti-chevron-right text-kale-300" />
-              </Link>
-            </>
-          )}
+          {/* Help / Feedback — unhidden on brand-site for Phase 1.5. TSK-127. */}
+          <>
+            <div className="border-t border-kale-100 my-2" />
+            <div className="text-[10px] text-kale-400 uppercase tracking-widest px-5 pt-3 pb-2 font-medium">
+              {str.help_label}
+            </div>
+            <Link
+              href="/feedback"
+              className="flex items-center gap-3 px-5 py-3 text-sm text-ink hover:bg-kale-50 active:bg-kale-100"
+            >
+              <i className="ti ti-message-circle text-xl text-kale-700 w-6 text-center" />
+              <span className="flex-1">{str.feedback}</span>
+              <i className="ti ti-chevron-right text-kale-300" />
+            </Link>
+          </>
 
-          {/* Sign in — hidden in brand-site (Phase 1 has no auth). TSK-122. */}
-          {!user && !isBrandSite && (
+          {/* Sign in — unhidden on brand-site for Phase 1.5 (auth now exists). TSK-127. */}
+          {!user && (
             <>
               <div className="border-t border-kale-100 my-2" />
               <Link
