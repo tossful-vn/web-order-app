@@ -1123,43 +1123,40 @@ export default function Calculator() {
         {/* Bowl-building chrome footer — only shown in edit view */}
         {view === "edit" && (
           <>
-            {/* Bowl naming is part of the save affordance — hidden in brand-site
-                (Phase 1, no auth, nothing to save to). TSK-122. */}
-            {!isBrandSite && (
-              <div className="name-row">
-                <label className="name-label" htmlFor="bowl-name-input">
-                  {str.bowl_name_label}
-                </label>
-                <input
-                  id="bowl-name-input"
-                  className="name-input"
-                  type="text"
-                  maxLength={60}
-                  placeholder={str.bowl_name_placeholder}
-                  value={bowlName}
-                  onChange={(e) => {
-                    setBowlName(e.target.value);
-                    setBowlNameCustom(true);
-                  }}
-                />
-                {!bowlNameCustom && bowlName && (
-                  <div className="name-suggest-note">{str.bowl_name_hint}</div>
-                )}
-              </div>
-            )}
+            {/* Bowl naming is part of the save affordance — unhidden on brand-site
+                for Phase 1.5 (auth now exists, bowls are saveable). TSK-127. */}
+            <div className="name-row">
+              <label className="name-label" htmlFor="bowl-name-input">
+                {str.bowl_name_label}
+              </label>
+              <input
+                id="bowl-name-input"
+                className="name-input"
+                type="text"
+                maxLength={60}
+                placeholder={str.bowl_name_placeholder}
+                value={bowlName}
+                onChange={(e) => {
+                  setBowlName(e.target.value);
+                  setBowlNameCustom(true);
+                }}
+              />
+              {!bowlNameCustom && bowlName && (
+                <div className="name-suggest-note">{str.bowl_name_hint}</div>
+              )}
+            </div>
             <div className="foot">
               <button className="btn ghost" onClick={() => { reset(); setBowlNameCustom(false); }}>
                 {str.reset}
               </button>
-              {!isBrandSite && (
-                <button
-                  className="btn kale"
-                  onClick={handleSave}
-                  disabled={saving || Object.keys(selected).length === 0}
-                >
-                  {saving ? str.saving : str.save_bowl}
-                </button>
-              )}
+              {/* Save bowl — unhidden on brand-site for Phase 1.5. TSK-127. */}
+              <button
+                className="btn kale"
+                onClick={handleSave}
+                disabled={saving || Object.keys(selected).length === 0}
+              >
+                {saving ? str.saving : str.save_bowl}
+              </button>
             </div>
             {saveError && <div className="save-error">{saveError}</div>}
             <div className="foot-note">{str.microcopy}</div>

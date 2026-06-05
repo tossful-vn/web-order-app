@@ -16,6 +16,7 @@ type Props = {
 /**
  * Password input with a reveal toggle. Inline SVG icons so it works
  * regardless of whether the Tabler icon stylesheet is loaded.
+ * Shared by /login, /signup, /reset-password (TSK-127).
  */
 export default function PasswordField({
   name,
