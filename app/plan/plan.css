@@ -1,0 +1,10 @@
+/* /plan planner (TSK-118) — small bits Tailwind utilities don't cover. */
+
+/* Hide the scrollbar on the saved-bowls horizontal strip (mobile). */
+.plan-noscroll {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+.plan-noscroll::-webkit-scrollbar {
+  display: none; /* WebKit */
+}
