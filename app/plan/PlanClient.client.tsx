@@ -1,9 +1,21 @@
 "use client";
 
 import { useMemo, useRef, useState, useTransition } from "react";
+import {
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  MouseSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
 import { useLang } from "@/lib/lang";
 import { upsertPlan } from "@/lib/byw";
 import type { BywSlots, DayKey } from "@/lib/types/database";
+import type { DragData, DropData } from "./types";
 import { lookupSignaturePhoto } from "@/app/nutrition/photo-maps";
 import {
   DAY_KEYS,
@@ -48,10 +60,24 @@ export default function PlanClient({
   const [detailDay, setDetailDay] = useState<DayKey | null>(null);
   const [toast, setToast] = useState<"saving" | "saved" | null>(null);
   const [continued, setContinued] = useState(false);
+  const [activeDrag, setActiveDrag] = useState<DragData | null>(null);
   const [, startSave] = useTransition();
 
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hide = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── DnD sensors (TSK-119) ──────────────────────────────────────────────────
+  // Drag is initiated only from a grip handle (see DaySlot / DrawerCard), which
+  // is the lone element carrying `touch-action: none`. That confines the gesture
+  // capture to the grip — iOS Safari no longer swallows the press-hold before the
+  // TouchSensor can claim it, while the rest of the page/drawer keeps scrolling.
+  // TouchSensor's short delay still guards against an accidental drag if a finger
+  // lands on the grip mid-scroll; mouse drags activate after 8px.
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 100, tolerance: 5 } }),
+    useSensor(KeyboardSensor)
+  );
 
   // ── Resolve slot ids (saved_bowls.id OR signature id) to renderable bowls ──
   const bowlById = useMemo(() => {
@@ -157,6 +183,54 @@ export default function PlanClient({
     else scheduleSave(next);
   }
 
+  // Move/swap a bowl between two day slots in one update. Empty target → move;
+  // filled target → swap the two bowls.
+  function moveOrSwap(from: DayKey, to: DayKey) {
+    if (from === to) return;
+    const next: BywSlots = {
+      ...slots,
+      [from]: slots[to] ?? null,
+      [to]: slots[from] ?? null,
+    };
+    setSlots(next);
+    scheduleSave(next);
+  }
+
+  // ── DnD event handlers ─────────────────────────────────────────────────────
+  function handleDragStart(e: DragStartEvent) {
+    setActiveDrag((e.active.data.current as DragData | undefined) ?? null);
+  }
+
+  function handleDragCancel() {
+    setActiveDrag(null); // released outside any droppable → restore (no save)
+  }
+
+  function handleDragEnd(e: DragEndEvent) {
+    setActiveDrag(null);
+    const src = e.active.data.current as DragData | undefined;
+    const dst = e.over?.data.current as DropData | undefined;
+    if (!src || !dst) return; // dropped outside any droppable → no change
+
+    if (src.type === "drawerBowl") {
+      // Drawer bowl → slot: assign (replaces whatever was there). Dropping back
+      // on the drawer is a no-op.
+      if (dst.type === "slot") assign(dst.day, src.bowlId);
+      return;
+    }
+
+    // src.type === "slot"
+    if (dst.type === "drawerZone") {
+      assign(src.day, null); // slot bowl → drawer: remove from the day
+    } else if (dst.type === "slot") {
+      moveOrSwap(src.day, dst.day);
+    }
+  }
+
+  const dragActive = activeDrag !== null;
+  const slotDragActive = activeDrag?.type === "slot";
+  const overlayBowl =
+    activeDrag && activeDrag.bowlId ? bowlById.get(activeDrag.bowlId) ?? null : null;
+
   function handleSlotClick(day: DayKey) {
     if (resolveSlot(day)) {
       setDetailDay(day); // filled → open options
@@ -193,7 +267,13 @@ export default function PlanClient({
   const detailBowl = detailDay !== null ? resolveSlot(detailDay) : null;
 
   return (
-    <div className="max-w-5xl mx-auto px-3 pt-4 pb-6">
+    <DndContext
+      sensors={sensors}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
+    >
+      <div className="max-w-5xl mx-auto px-3 pt-4 pb-6">
       <WeekSelector
         lang={lang}
         title={str.title(displayName)}
@@ -231,6 +311,8 @@ export default function PlanClient({
             bowls={drawerBowls}
             selectedDayLabel={selectedDayLabel}
             onPick={handlePick}
+            idScope="desktop"
+            slotDragActive={slotDragActive}
           />
         </div>
 
@@ -250,11 +332,13 @@ export default function PlanClient({
               <DaySlot
                 key={day}
                 lang={lang}
+                day={day}
                 dayLong={str.days_long[i]}
                 dayEn={str.days_en[i]}
                 dateLabel={dayShort(weekStart, i)}
                 bowl={resolveSlot(day)}
                 selected={selectedDay === day}
+                dragActive={dragActive}
                 onSelect={() => handleSlotClick(day)}
                 onRemove={() => assign(day, null)}
               />
@@ -270,6 +354,8 @@ export default function PlanClient({
           bowls={drawerBowls}
           selectedDayLabel={selectedDayLabel}
           onPick={handlePick}
+          idScope="mobile"
+          slotDragActive={slotDragActive}
         />
       </div>
 
@@ -335,6 +421,31 @@ export default function PlanClient({
           </div>
         </div>
       )}
-    </div>
+      </div>
+
+      {/* Drag ghost — follows the pointer/finger while dragging */}
+      <DragOverlay dropAnimation={null}>
+        {overlayBowl ? (
+          <div className="flex items-center gap-2 rounded-2xl border border-kale-300 bg-white px-3 py-2 shadow-xl opacity-90 pointer-events-none">
+            {overlayBowl.photo ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={overlayBowl.photo}
+                alt=""
+                draggable={false}
+                className="w-10 h-10 rounded-lg object-cover bg-kale-50 shrink-0"
+              />
+            ) : (
+              <div className="w-10 h-10 rounded-lg bg-kale-700 text-cream flex items-center justify-center text-base font-display italic shrink-0">
+                {(overlayBowl.name_en || "?").trim().charAt(0).toUpperCase()}
+              </div>
+            )}
+            <span className="text-sm font-medium text-ink truncate max-w-[40vw]">
+              {lang === "vi" && overlayBowl.name_vn ? overlayBowl.name_vn : overlayBowl.name_en}
+            </span>
+          </div>
+        ) : null}
+      </DragOverlay>
+    </DndContext>
   );
 }

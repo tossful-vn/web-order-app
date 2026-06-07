@@ -8,3 +8,53 @@
 .plan-noscroll::-webkit-scrollbar {
   display: none; /* WebKit */
 }
+
+/* ── Drag-and-drop (TSK-119) ──────────────────────────────────────────────── */
+
+/* Draggable cards: stop the iOS long-press callout / text selection from firing
+   when a press-hold lands on the card. */
+.plan-draggable,
+.plan-slot {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Drag handle (TSK-119 iOS fix). The drag listeners live on this handle alone, so
+   `touch-action: none` is confined here: iOS Safari hands the press-hold to
+   @dnd-kit instead of swallowing it for a native gesture, while the card body /
+   page / drawer keep default touch-action so body taps and horizontal scroll
+   still work. Grab the handle → drag; grab anywhere else → scroll/scroll. This is
+   the explicit-handle pattern (Trello / Notion / Sweetgreen). */
+.plan-drag-handle {
+  touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: grab;
+}
+.plan-drag-handle:active {
+  cursor: grabbing;
+}
+
+/* Empty slot gently pulses while a drag is in progress: "drop here". */
+@keyframes plan-slot-pulse {
+  0%,
+  100% {
+    border-color: #a4c098; /* kale-300 */
+  }
+  50% {
+    border-color: #5c8650; /* kale-500 */
+    background-color: #f3f7f1; /* kale-50 */
+  }
+}
+.plan-slot-pulse {
+  animation: plan-slot-pulse 1.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plan-slot-pulse {
+    animation: none;
+    border-color: #5c8650; /* kale-500 — static affordance */
+  }
+}

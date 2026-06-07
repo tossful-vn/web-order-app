@@ -9,10 +9,11 @@ const VI_week_prev = "Tuần trước";
 const VI_week_next = "Tuần sau";
 const VI_macros_header = "Macros tuần này";
 const VI_avg_label = "Trung bình mỗi ngày";
-const VI_empty_slot = "Chạm để chọn bowl";
+const VI_empty_slot = "Kéo bowl vào đây hoặc chạm để chọn";
 const VI_slot_prompt = "Chọn bowl từ “Bowl đã lưu” bên dưới";
 const VI_drawer_title = "Bowl đã lưu";
 const VI_drawer_idle = "Chạm một ngày, rồi chọn bowl";
+const VI_drawer_remove_hint = "Thả vào đây để xóa khỏi ngày";
 const VI_no_saved = "Bạn chưa lưu bowl nào. Mở máy tính để tạo và lưu.";
 const VI_open_calc = "Mở máy tính";
 const VI_template_start = "Bắt đầu với plan này";
@@ -29,6 +30,7 @@ const VI_continue_q = "Tiếp tục tuần trước?";
 const VI_continue_do = "Sao chép kế hoạch";
 const VI_close = "Đóng";
 const VI_per_bowl = "/bowl";
+const VI_drag_handle = "Kéo để di chuyển";
 const VI_days_long = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6"];
 const VI_days_en = ["Mon", "Tue", "Wed", "Thu", "Fri"];
 
@@ -41,10 +43,11 @@ export const PLAN_STR = {
     week_next: "Next week",
     macros_header: "This week's macros",
     avg_label: "Avg per day",
-    empty_slot: "Tap to add a bowl",
+    empty_slot: "Drag a bowl or tap to add",
     slot_prompt: "Pick from your saved bowls below",
     drawer_title: "Saved bowls",
     drawer_idle: "Tap a day, then pick a bowl",
+    drawer_remove_hint: "Drop here to remove from the day",
     no_saved: "No saved bowls yet. Open the calculator to build and save.",
     open_calc: "Open calculator",
     template_start: "Start with this plan",
@@ -60,6 +63,7 @@ export const PLAN_STR = {
     continue_q: "Continue last week?",
     continue_do: "Copy plan",
     close: "Close",
+    drag_handle: "Drag to move",
     per_bowl: "/bowl",
     days_long: VI_days_en,
     days_en: VI_days_en,
@@ -81,6 +85,7 @@ export const PLAN_STR = {
     slot_prompt: VI_slot_prompt,
     drawer_title: VI_drawer_title,
     drawer_idle: VI_drawer_idle,
+    drawer_remove_hint: VI_drawer_remove_hint,
     no_saved: VI_no_saved,
     open_calc: VI_open_calc,
     template_start: VI_template_start,
@@ -96,6 +101,7 @@ export const PLAN_STR = {
     continue_q: VI_continue_q,
     continue_do: VI_continue_do,
     close: VI_close,
+    drag_handle: VI_drag_handle,
     per_bowl: VI_per_bowl,
     days_long: VI_days_long,
     days_en: VI_days_en,
