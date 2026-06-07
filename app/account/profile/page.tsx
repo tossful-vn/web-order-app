@@ -1,7 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { updateProfile } from "@/lib/profile/actions";
 import { getServerLang } from "@/lib/lang-server";
-import type { Profile } from "@/lib/types/database";
+import type { Profile, StoreCity } from "@/lib/types/database";
+import StoreToggle from "./StoreToggle.client";
 
 const STRINGS = {
   en: {
@@ -41,7 +42,8 @@ export async function generateMetadata() {
 }
 
 export default async function ProfilePage() {
-  const s = STRINGS[getServerLang()];
+  const lang = getServerLang();
+  const s = STRINGS[lang];
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -82,29 +84,23 @@ export default async function ProfilePage() {
           <p className="text-xs text-kale-500 mt-1">{s.phone_note}</p>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-kale-700 mb-2">{s.store_label}</label>
-          <div className="grid grid-cols-2 gap-3">
-            {(["HN", "HCM"] as const).map((st) => (
-              <label key={st} className="flex items-center gap-3 border border-kale-200 rounded-lg p-3 cursor-pointer">
-                <input
-                  type="radio"
-                  name="preferred_store"
-                  value={st}
-                  defaultChecked={(p.preferred_store ?? "HN") === st}
-                />
-                <span>{st === "HN" ? s.store_hn : s.store_sg}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-
         <div className="pt-4">
           <button type="submit" className="bg-kale-700 text-white px-6 py-3 rounded-lg font-medium">
             {s.save}
           </button>
         </div>
       </form>
+
+      {/* Preferred store (TSK-130) — self-contained, saves on tap with a toast,
+          so it stays out of the name/phone form above. */}
+      <StoreToggle
+        initial={
+          p.preferred_store === "HN" || p.preferred_store === "HCM"
+            ? (p.preferred_store as StoreCity)
+            : null
+        }
+        lang={lang}
+      />
 
       <section className="pt-8 border-t border-kale-100 text-sm text-kale-500">
         <p>{s.signed_in_pre} <strong className="text-kale-700">{user!.email}</strong></p>

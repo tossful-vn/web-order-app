@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { saveBowl } from "@/lib/bowls/actions";
+import { setPreferredStore } from "@/lib/profile/actions";
+import CityPromptModal from "@/lib/components/CityPromptModal.client";
 import type { BowlComposition } from "@/lib/types/database";
 import { useLang, type Lang } from "@/lib/lang";
 import {
@@ -59,8 +61,10 @@ function formatPrice(vnd: number | null | undefined): string {
   return `${vnd} đ`;
 }
 
-function priceFor(item: Item | undefined, store: StoreCity): number {
-  if (!item) return 0;
+// store === null → customer hasn't chosen a city yet, so we have no price to
+// show (prices are city-specific). Returns 0 and the UI hides the price. (D8)
+function priceFor(item: Item | undefined, store: StoreCity | null): number {
+  if (!item || store === null) return 0;
   return (store === "HCM" ? item.price_vnd_hcm : item.price_vnd_hn) ?? 0;
 }
 
@@ -225,10 +229,26 @@ function suggestBowlName(
 }
 
 // ===== Component =====
-export default function Calculator() {
+type CalculatorProps = {
+  /** From the server: is there an authenticated customer this request? */
+  isLoggedIn: boolean;
+  /** profiles.preferred_store resolved server-side — null = not yet chosen. */
+  initialCity: StoreCity | null;
+  /** IP-detected likely store for pre-highlighting the prompt (never auto-set). */
+  suggestedCity: StoreCity | null;
+};
+
+// sessionStorage flag — once the customer taps "Bỏ qua" we suppress the city
+// prompt for the rest of the session (it returns in a fresh session). TSK-130.
+const CITY_PROMPT_SKIP_KEY = "tossful:city_prompt_skipped";
+
+export default function Calculator({ isLoggedIn, initialCity, suggestedCity }: CalculatorProps) {
   const supabase = useMemo(() => createClient(), []);
   const [userName, setUserName] = useState<string | null>(null);
-  const [store, setStore] = useState<StoreCity>("HN"); // default HN (cheaper menu)
+  // City-based pricing (D8 / TSK-130): null until the customer picks a store.
+  // While null, every price stays hidden and the lazy prompt can fire.
+  const [city, setCity] = useState<StoreCity | null>(initialCity);
+  const [showCityModal, setShowCityModal] = useState(false);
   // Saved bowls (compressed to {name, sortedIds}) for combo-match labelling.
   // Lets the macro-bar pill show the saved-bowl's name when the customer
   // builds the same combination again later.
@@ -243,7 +263,7 @@ export default function Calculator() {
       const [{ data: profile }, { data: savedBowls }] = await Promise.all([
         supabase
           .from("profiles")
-          .select("display_name, preferred_store")
+          .select("display_name")
           .eq("id", user.id)
           .maybeSingle(),
         supabase
@@ -261,12 +281,6 @@ export default function Calculator() {
         // Fallback: email local-part, capitalised
         const local = user.email.split("@")[0];
         setUserName(local.charAt(0).toUpperCase() + local.slice(1));
-      }
-      const ps = (profile?.preferred_store ?? "").trim().toUpperCase();
-      if (ps === "HCM" || ps === "HCMC" || ps === "SAIGON" || ps === "HỒ CHÍ MINH") {
-        setStore("HCM");
-      } else if (ps === "HN" || ps === "HANOI" || ps === "HÀ NỘI") {
-        setStore("HN");
       }
       // Compress saved bowls to {name, sortedIds} for fast equality compare.
       // We only need ids; quantities aren't tracked in composition the same
@@ -341,6 +355,43 @@ export default function Calculator() {
 
   // Restore hydration flag after first render (used by other effects)
   useEffect(() => { setHydrated(true); }, []);
+
+  // Lazy city prompt (TSK-130). Fire the first time a logged-in customer with
+  // no chosen store reaches the price-bearing "edit" view. Guests, brand-site
+  // proxies, customers who already picked a city, and anyone who tapped "Bỏ
+  // qua" this session are all skipped. Re-evaluates as state changes, so the
+  // moment a city is set (or skip flag written) it stops firing.
+  useEffect(() => {
+    if (!isLoggedIn || isBrandSite) return;
+    if (city !== null) return;
+    if (view !== "edit") return;
+    if (typeof window !== "undefined" && window.sessionStorage.getItem(CITY_PROMPT_SKIP_KEY)) {
+      return;
+    }
+    setShowCityModal(true);
+  }, [isLoggedIn, isBrandSite, city, view]);
+
+  // Customer picked a store in the prompt — persist + reveal prices. Optimistic:
+  // flip local state first so prices appear instantly; the server action syncs
+  // profiles.preferred_store in the background.
+  const handleCitySelect = useCallback((c: StoreCity) => {
+    setCity(c);
+    setShowCityModal(false);
+    void setPreferredStore(c).catch(() => {
+      /* non-fatal: prices already shown locally; next load re-reads the server */
+    });
+  }, []);
+
+  // "Bỏ qua" — dismiss without choosing. Prices stay hidden; suppress the
+  // prompt for the rest of this session (it returns in a fresh session).
+  const handleCitySkip = useCallback(() => {
+    setShowCityModal(false);
+    try {
+      window.sessionStorage.setItem(CITY_PROMPT_SKIP_KEY, "1");
+    } catch {
+      /* sessionStorage disabled — modal simply may reappear; harmless */
+    }
+  }, []);
 
   // Load items + signature bowls from Supabase
   useEffect(() => {
@@ -558,7 +609,7 @@ export default function Calculator() {
         if (!item || item.category !== cat) continue;
         const portion = (item.tossful_portion_g ?? 0) * qty;
         const cal = macrosFor(item).calories * qty;
-        const price = priceFor(item, store) * qty;
+        const price = priceFor(item, city) * qty;
         totalG += portion;
         totalCal += cal;
         totalPrice += price;
@@ -569,10 +620,10 @@ export default function Calculator() {
     // the signature's own menu price (bundled discount), not the sum.
     const finalPrice =
       isPristineSignature && signatureItem
-        ? priceFor(signatureItem, store)
+        ? priceFor(signatureItem, city)
         : totalPrice;
     return { rows, totalG, totalCal, totalPrice: finalPrice, isSignaturePrice: isPristineSignature };
-  }, [selected, items, store, isPristineSignature, signatureItem]);
+  }, [selected, items, city, isPristineSignature, signatureItem]);
 
   // ===== Handlers =====
   const toggleChip = useCallback(
@@ -1049,10 +1100,11 @@ export default function Calculator() {
                 <h3>
                   {str.your_bowl}
                   <span className="total-g">
-                    {/* Prices are store-specific (HN vs HCM); the brand site is
-                        store-agnostic in Phase 1, so hide every price display when
-                        proxied via ?src=brand-site. Macros/grams stay. TSK-124. */}
-                    {!isBrandSite && summaryRows.totalPrice > 0 && (
+                    {/* Prices are store-specific (HN vs HCM). Show only once the
+                        logged-in customer has chosen a city (TSK-130 / D8); the
+                        legacy brand-site guard stays as dead code pending the
+                        Sprint 4 cleanup. */}
+                    {city !== null && !isBrandSite && summaryRows.totalPrice > 0 && (
                       <span className="total-price" title={summaryRows.isSignaturePrice ? "Giá signature (đã bao gồm ưu đãi combo) · Signature price (combo discount applied)" : undefined}>
                         {formatPrice(summaryRows.totalPrice)}
                         {summaryRows.isSignaturePrice && (
@@ -1100,7 +1152,7 @@ export default function Calculator() {
                           </div>
                           <div className="row-meta">
                             <span className="gram" title={`${Math.round(portion)}g`}>{Math.round(cal)} cal</span>
-                            {!isBrandSite && price > 0 && <span className="row-price" title={`${price.toLocaleString("vi-VN")} đ`}>{formatPrice(price)}</span>}
+                            {city !== null && !isBrandSite && price > 0 && <span className="row-price" title={`${price.toLocaleString("vi-VN")} đ`}>{formatPrice(price)}</span>}
                           </div>
                           <button
                             className="remove"
@@ -1203,6 +1255,17 @@ export default function Calculator() {
           </>
         )}
       </div>
+
+      {/* Lazy city prompt (TSK-130) — gates the first price display for a
+          logged-in customer who hasn't chosen a store yet. */}
+      {showCityModal && (
+        <CityPromptModal
+          lang={lang}
+          suggestedCity={suggestedCity}
+          onSelect={handleCitySelect}
+          onClose={handleCitySkip}
+        />
+      )}
     </div>
   );
 }

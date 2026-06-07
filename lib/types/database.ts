@@ -25,7 +25,12 @@ export type Profile = {
    */
   phone: string | null;
   contact_phone: string | null;
-  preferred_store: StoreCity;
+  /**
+   * NULL until the customer picks a store (TSK-130). New signups start unset so
+   * the calculator shows the lazy "which store?" prompt before revealing
+   * city-specific prices; guests and unset customers see no prices at all.
+   */
+  preferred_store: StoreCity | null;
   role: ProfileRole;
   zalo_oa_subscribed: boolean;
   locale: string;
