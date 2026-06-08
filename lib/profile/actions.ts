@@ -73,3 +73,27 @@ export async function clearPreferredStore(): Promise<void> {
   revalidatePath("/nutrition");
   revalidatePath("/account/profile");
 }
+
+/**
+ * Toggle the customer's marketing-email consent (TSK-143). Called from the
+ * /account/profile toggle. There is deliberately NO setConsentTransactional:
+ * transactional consent is a server-side rule (always TRUE) — turning it off
+ * would mean we can't send order confirmations, so it's not user-toggleable.
+ */
+export async function setConsentMarketing(enabled: boolean): Promise<void> {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      consent_marketing: enabled,
+      consent_updated_at: new Date().toISOString(),
+    })
+    .eq("id", user.id);
+  if (error) throw new Error(error.message);
+  revalidatePath("/account/profile");
+}

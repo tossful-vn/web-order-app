@@ -20,6 +20,7 @@ const STRINGS = {
     must_try_remove: "Remove from Must Try",
     section_must_try: "Must Try",
     section_saved_bowls: "All saved bowls",
+    welcome: "Welcome to Tossful! Your account is ready.",
   },
   vi: {
     title: "Bowl của bạn",
@@ -35,6 +36,7 @@ const STRINGS = {
     must_try_remove: "Bỏ khỏi Phải thử",
     section_must_try: "Phải thử",
     section_saved_bowls: "Tất cả bowl đã lưu",
+    welcome: "Chào mừng đến với Tossful! Tài khoản của bạn đã sẵn sàng.",
   },
 } as const;
 
@@ -80,9 +82,14 @@ function extractIngredientNames(comp: BowlRow["composition"]): string[] {
   return Array.from(new Set(names.filter(Boolean)));
 }
 
-export default async function AccountPage() {
+export default async function AccountPage({
+  searchParams,
+}: {
+  searchParams: { welcome?: string };
+}) {
   const lang = getServerLang();
   const s = STRINGS[lang];
+  const showWelcome = searchParams.welcome === "1";
   const supabase = createClient();
   // Favourites first, then newest. is_favourite desc puts true (1) before false (0).
   const { data: bowls } = await supabase
@@ -98,6 +105,12 @@ export default async function AccountPage() {
   return (
     <div className="space-y-8 p-6 max-w-5xl mx-auto w-full">
       <GuestBowlClaim />
+
+      {showWelcome && (
+        <div className="rounded-xl bg-kale-50 border border-kale-100 text-kale-700 text-sm px-4 py-3" role="status">
+          {s.welcome}
+        </div>
+      )}
 
       <section>
         <h1 className="font-display text-4xl text-kale-700 mb-2">{s.title}</h1>

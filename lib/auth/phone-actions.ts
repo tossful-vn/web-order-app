@@ -16,12 +16,24 @@ const MSG_OTP_NOT_FOUND = "Không tìm thấy mã OTP, vui lòng yêu cầu lạ
 const MSG_LOGIN_FAILED = "Số điện thoại hoặc mật khẩu không đúng.";
 const MSG_PHONE_NOT_REGISTERED = "Số điện thoại chưa được đăng ký.";
 const MSG_GENERIC = "Có lỗi xảy ra, vui lòng thử lại.";
+// TSK-143 — email-primary signup + unified login.
+const MSG_LOGIN_FAILED_ID = "Email/số điện thoại hoặc mật khẩu không đúng.";
+const MSG_EMAIL_REQUIRED = "Vui lòng nhập email.";
+const MSG_EMAIL_INVALID = "Email không hợp lệ.";
+const MSG_EMAIL_TAKEN = "Email đã được sử dụng.";
+const MSG_CONSENT_REQUIRED =
+  "Cần đồng ý để chúng tôi gửi xác nhận đơn hàng. Không đồng ý thì không thể tạo tài khoản.";
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isValidVnPhone, normalizePhone, syntheticEmail } from "@/lib/auth/phone";
+import {
+  isValidPhone,
+  isValidVnPhone,
+  normalizePhone,
+  syntheticEmail,
+} from "@/lib/auth/phone";
 import { requestOtp, verifyOtp, type VerifyResult } from "@/lib/auth/otp";
 
 /** Build a query string from defined, non-empty params. */
@@ -38,6 +50,11 @@ function qs(params: Record<string, string | undefined>): string {
 function safeNext(raw: string | undefined): string {
   if (raw && raw.startsWith("/") && !raw.startsWith("//")) return raw;
   return "/account";
+}
+
+/** Minimal email shape check — server-side backstop for the browser's type=email. */
+function isValidEmail(raw: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw);
 }
 
 /** Map an OTP verify result to its customer-facing error (null when ok). */
@@ -244,4 +261,128 @@ export async function verifyResetOtp(formData: FormData): Promise<void> {
 
   revalidatePath("/", "layout");
   redirect("/account");
+}
+
+// ---------------------------------------------------------------------------
+// LOGIN (TSK-143) — single identifier: email OR phone, + password
+// ---------------------------------------------------------------------------
+// D11 (locked 2026-06-04): email primary, phone optional. A single field
+// accepts either; "@" routes to real-email auth, otherwise we treat it as a
+// phone and look up the synthetic backing email. The error is deliberately
+// identical for every failure mode so it never leaks which field was wrong.
+export async function signIn(formData: FormData): Promise<void> {
+  const identifier = String(formData.get("identifier") ?? "").trim();
+  const password = String(formData.get("password") ?? "");
+  const next = String(formData.get("next") ?? "");
+
+  const fail = () => redirect("/login" + qs({ error: MSG_LOGIN_FAILED_ID, next }));
+
+  if (!identifier || !password) fail();
+
+  let email: string;
+  if (identifier.includes("@")) {
+    email = identifier.toLowerCase();
+  } else {
+    const phone = normalizePhone(identifier);
+    if (!isValidPhone(phone)) fail();
+    email = syntheticEmail(phone);
+  }
+
+  const supabase = createClient();
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) fail();
+
+  revalidatePath("/", "layout");
+  redirect(safeNext(next));
+}
+
+// ---------------------------------------------------------------------------
+// SIGNUP (TSK-143) — email mandatory + phone optional + consent, NO OTP
+// ---------------------------------------------------------------------------
+// Per Hieu (2026-06-08): pre-confirm via Admin API and sign in immediately so
+// the beta team gets instant access without an inbox round-trip. Real email is
+// the auth identity (no synthetic). Consent is captured for VN PDPL readiness;
+// transactional is force-TRUE server-side regardless of the posted value.
+export async function signUpWithEmail(formData: FormData): Promise<void> {
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const name = String(formData.get("display_name") ?? "").trim();
+  const password = String(formData.get("password") ?? "");
+  const phoneRaw = String(formData.get("phone") ?? "");
+  const phone = phoneRaw.trim() ? normalizePhone(phoneRaw) : "";
+  // HTML checkboxes post "on" when ticked, nothing when not.
+  const consentMarketing = formData.get("consent_marketing") === "on";
+  const consentTransactional = formData.get("consent_transactional") === "on";
+  const next = String(formData.get("next") ?? "");
+
+  const back = (error: string) =>
+    redirect("/signup" + qs({ error, email, name, phone, next }));
+
+  if (!email) back(MSG_EMAIL_REQUIRED);
+  if (!isValidEmail(email)) back(MSG_EMAIL_INVALID);
+  if (name.length < 2) back(MSG_NAME_REQUIRED);
+  if (password.length < 8) back(MSG_PASSWORD_SHORT);
+  if (phone && !isValidPhone(phone)) back(MSG_PHONE_INVALID);
+  if (!consentTransactional) back(MSG_CONSENT_REQUIRED);
+
+  const admin = createAdminClient();
+
+  // Guard the optional phone against collisions (phone is UNIQUE in profiles).
+  if (phone) {
+    const { data: existing } = await admin
+      .from("profiles")
+      .select("id")
+      .eq("phone", phone)
+      .maybeSingle();
+    if (existing) back(MSG_PHONE_TAKEN);
+  }
+
+  // Create the auth user with the REAL email, pre-confirmed (no inbox dance).
+  const { data: created, error: createErr } = await admin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    user_metadata: { display_name: name },
+  });
+  if (createErr || !created?.user) {
+    // Most likely cause: the email is already registered.
+    return back(MSG_EMAIL_TAKEN);
+  }
+
+  const userId = created.user.id;
+
+  // The on_auth_user_created trigger already inserted a profiles row with
+  // defaults; upsert to set name/phone/consent and force preferred_store NULL
+  // so the TSK-130 lazy city prompt knows it's unset. consent_transactional is
+  // hard-coded TRUE — never trust the client for the service-required consent.
+  const { error: profileErr } = await admin.from("profiles").upsert(
+    {
+      id: userId,
+      phone: phone || null,
+      display_name: name,
+      preferred_store: null,
+      role: "customer",
+      zalo_oa_subscribed: false,
+      consent_marketing: consentMarketing,
+      consent_transactional: true,
+      consent_updated_at: new Date().toISOString(),
+    },
+    { onConflict: "id" }
+  );
+  if (profileErr) back(MSG_GENERIC);
+
+  // Establish the session via the cookie-bound server client.
+  const supabase = createClient();
+  const { error: signInErr } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+  if (signInErr) {
+    // Account exists now; send them to login rather than failing hard.
+    redirect("/login" + qs({ error: MSG_LOGIN_FAILED, next }));
+  }
+
+  revalidatePath("/", "layout");
+  // Honour a safe ?next, else land on the welcome state.
+  if (next && next.startsWith("/") && !next.startsWith("//")) redirect(next);
+  redirect("/account?welcome=1");
 }
