@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getPreferredStore } from "@/lib/profile/preferred-store";
 import AppShell from "@/lib/components/AppShell.client";
 
 export default async function FeedbackLayout({
@@ -9,5 +10,10 @@ export default async function FeedbackLayout({
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const userObj = user ? { email: user.email } : null;
-  return <AppShell user={userObj}>{children}</AppShell>;
+  const preferredStore = user ? await getPreferredStore(user.id) : null;
+  return (
+    <AppShell user={userObj} preferredStore={preferredStore}>
+      {children}
+    </AppShell>
+  );
 }
