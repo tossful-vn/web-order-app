@@ -36,6 +36,15 @@ const VI_picker_saved_bowls = "Bowl đã lưu";
 const VI_picker_sub_bowls = "Bowl";
 const VI_picker_sub_wraps = "Cuộn";
 const VI_picker_sub_sides = "Món thêm";
+// Weekly macros summary banner (ported from /plan, TSK-141)
+const VI_macros_header = "Macros tuần này";
+const VI_avg_label = "Trung bình mỗi ngày";
+// DnD strings (backported from closed PR #9, TSK-141)
+const VI_drag_handle = "Kéo để di chuyển";
+const VI_drawer_title = "Bowl đã lưu";
+const VI_drawer_idle = "Chạm một ngày, rồi kéo bowl vào";
+const VI_drawer_remove_hint = "Thả vào đây để xóa khỏi ngày";
+const VI_drawer_no_saved = "Bạn chưa lưu bowl nào. Mở máy tính để tạo và lưu.";
 
 const EN_days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
 const EN_days_short = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
@@ -78,6 +87,15 @@ export const BYW_STR = {
     picker_sub_wraps: "Wraps",
     picker_sub_sides: "Sides",
     macro_cal: "CAL", macro_protein: "PROTEIN", macro_fat: "FAT", macro_carbs: "CARBS", macro_fiber: "FIBER",
+    macros_header: "This week's macros",
+    avg_label: "Avg per day",
+    banner_protein: "protein", banner_fat: "fat", banner_carb: "carb",
+    drag_handle: "Drag to move",
+    drawer_title: "Saved bowls",
+    drawer_idle: "Tap a day, then drag a bowl in",
+    drawer_remove_hint: "Drop here to remove from the day",
+    drawer_no_saved: "No saved bowls yet. Open the calculator to build and save.",
+    pick_for: (day: string) => `Pick a bowl for ${day}`,
   },
   vi: {
     page_title: VI_page_title,
@@ -120,6 +138,15 @@ export const BYW_STR = {
     macro_fat: "BÉO",
     macro_carbs: "TINH BỘT",
     macro_fiber: "CHẤT XƠ",
+    macros_header: VI_macros_header,
+    avg_label: VI_avg_label,
+    banner_protein: "đạm", banner_fat: "béo", banner_carb: "tinh bột",
+    drag_handle: VI_drag_handle,
+    drawer_title: VI_drawer_title,
+    drawer_idle: VI_drawer_idle,
+    drawer_remove_hint: VI_drawer_remove_hint,
+    drawer_no_saved: VI_drawer_no_saved,
+    pick_for: (day: string) => `Chọn bowl cho ${day}`,
   },
 } as const;
 // trailing buffer
