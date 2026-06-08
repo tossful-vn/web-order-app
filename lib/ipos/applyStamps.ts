@@ -1,16 +1,21 @@
 /**
  * Apply Magic Stamps from parsed iPOS EOD orders (TSK-148).
  *
- * One attributable order → one stamp. Stamps land on the customer's stamp card,
- * keyed by their canonical phone: if a web account exists for that phone the
- * card is owned by that user; otherwise the card is recorded against the phone
- * alone so it can be back-filled to the user when they sign up.
+ * Magic Stamps are for WEB-ACCOUNT holders only: stamps start once a customer
+ * signs up with a verified mobile. So an iPOS order earns a stamp only when
+ *   1. its phone matches a `profiles` row (in this app `profiles.phone` is set
+ *      ONLY by the OTP-verified signup/reset flow, so a non-null phone == a
+ *      verified mobile), and
+ *   2. the order was placed on/after that account's signup (`profiles.created_at`)
+ *      — pre-signup orders do not count retroactively.
+ * Orders from unregistered / unverified phones, or placed before signup, are
+ * skipped (no phone-only cards).
  *
  * Idempotent on the iPOS `tran_id`: every stamp_entry carries `ipos_tran_id`
  * (unique) and `source='ipos_eod'`, so re-importing the same file inserts
  * nothing new. The 8-slot punch-card semantics are preserved — a full card
  * rolls to `reward_ready` and the next order opens a fresh collecting card.
- * NO redemption happens here (reward_choice / redeemed are never touched).
+ * NO redemption happens here.
  *
  * The core (`applyStamps`) talks to a tiny `StampStore` port so it can be unit
  * tested against an in-memory fake; `createSupabaseStampStore` is the live
@@ -24,8 +29,12 @@ const MAX_STAMPS = 8;
 const IPOS_SOURCE = "ipos_eod";
 const REWARD_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
-/** Owner of a stamp card: a web-account user when known, always a phone key. */
-export type CardOwner = { userId: string | null; phone: string };
+/** A registered customer with a verified mobile (profiles.phone is OTP-only). */
+export type VerifiedAccount = {
+  userId: string;
+  /** Signup moment (`profiles.created_at`) as epoch ms — the eligibility cutoff. */
+  signupAt: number;
+};
 
 export type CardRow = {
   id: string;
@@ -46,14 +55,17 @@ export type InsertResult = { ok: true } | { ok: false; duplicate: boolean };
 
 /** The narrow set of DB operations `applyStamps` needs. */
 export interface StampStore {
-  /** Resolve a web account (`profiles.id` = `auth.users.id`) by phone, or null. */
-  findUserIdByPhone(phone: string): Promise<string | null>;
+  /**
+   * Resolve a registered + verified account by phone, or null when the phone
+   * has no web account (so it earns no stamps).
+   */
+  findVerifiedAccountByPhone(phone: string): Promise<VerifiedAccount | null>;
   /** True if a stamp_entry already exists for this iPOS order (idempotency). */
   hasEntryForTranId(tranId: string): Promise<boolean>;
-  /** The owner's current `collecting` card with room left, or null. */
-  findCollectingCard(owner: CardOwner): Promise<CardRow | null>;
-  /** Open a fresh `collecting` card for the owner. */
-  createCard(owner: CardOwner): Promise<CardRow>;
+  /** The user's current `collecting` card with room left, or null. */
+  findCollectingCard(userId: string): Promise<CardRow | null>;
+  /** Open a fresh `collecting` card for the user. */
+  createCard(userId: string): Promise<CardRow>;
   /** Insert a stamp; reports a duplicate iPOS tran_id rather than throwing. */
   insertEntry(entry: NewEntry): Promise<InsertResult>;
   /** Advance card progress; mark `reward_ready` when it fills. NO redemption. */
@@ -69,9 +81,11 @@ export type ApplyStampsSummary = {
   attributable: number;
   inserted: number;
   skippedExisting: number;
+  /** Phone had no registered/verified web account. */
+  skippedNoAccount: number;
+  /** Order predates the account's signup (or has no usable date). */
+  skippedPreSignup: number;
   newCards: number;
-  linkedToProfile: number;
-  phoneOnly: number;
   errors: number;
 };
 
@@ -104,10 +118,19 @@ export async function applyStamps(
     attributable: orders.length,
     inserted: 0,
     skippedExisting: 0,
+    skippedNoAccount: 0,
+    skippedPreSignup: 0,
     newCards: 0,
-    linkedToProfile: 0,
-    phoneOnly: 0,
     errors: 0,
+  };
+
+  // Cache account lookups — heavy customers repeat the same phone many times.
+  const accountCache = new Map<string, VerifiedAccount | null>();
+  const accountFor = async (phone: string): Promise<VerifiedAccount | null> => {
+    if (accountCache.has(phone)) return accountCache.get(phone)!;
+    const acct = await store.findVerifiedAccountByPhone(phone);
+    accountCache.set(phone, acct);
+    return acct;
   };
 
   for (const order of sortOrders(orders)) {
@@ -117,23 +140,30 @@ export async function applyStamps(
       continue;
     }
 
-    // 2. Resolve owner (web account if the phone is registered, else phone-only).
-    const userId = await store.findUserIdByPhone(order.phone);
-    const owner: CardOwner = { userId, phone: order.phone };
+    // 2. Eligibility: must be a registered + verified web account.
+    const account = await accountFor(order.phone);
+    if (!account) {
+      summary.skippedNoAccount++;
+      continue;
+    }
 
-    // 3. Find the open collecting card, or roll to a fresh one.
-    let card = await store.findCollectingCard(owner);
+    // 3. Stamps start at signup — pre-signup (or undated) orders don't count.
+    if (order.tran_date === null || order.tran_date < account.signupAt) {
+      summary.skippedPreSignup++;
+      continue;
+    }
+
+    // 4. Find the open collecting card, or roll to a fresh one.
+    let card = await store.findCollectingCard(account.userId);
     if (!card || card.stamps_collected >= MAX_STAMPS) {
-      card = await store.createCard(owner);
+      card = await store.createCard(account.userId);
       summary.newCards++;
     }
 
     const nextStamp = card.stamps_collected + 1;
-    const earnedAt = order.tran_date
-      ? new Date(order.tran_date).toISOString()
-      : new Date().toISOString();
+    const earnedAt = new Date(order.tran_date).toISOString();
 
-    // 4. Insert the stamp. A duplicate tran_id here means a concurrent/re-run
+    // 5. Insert the stamp. A duplicate tran_id here means a concurrent/re-run
     //    insert beat us — treat as already-imported, not an error.
     const res = await store.insertEntry({
       card_id: card.id,
@@ -145,19 +175,14 @@ export async function applyStamps(
     });
 
     if (!res.ok) {
-      if (res.duplicate) {
-        summary.skippedExisting++;
-      } else {
-        summary.errors++;
-      }
+      if (res.duplicate) summary.skippedExisting++;
+      else summary.errors++;
       continue;
     }
 
     summary.inserted++;
-    if (userId) summary.linkedToProfile++;
-    else summary.phoneOnly++;
 
-    // 5. Advance the card; fill → reward_ready (next order opens a new card).
+    // 6. Advance the card; fill → reward_ready (next order opens a new card).
     await store.updateCardProgress(card.id, nextStamp, nextStamp >= MAX_STAMPS, earnedAt);
   }
 
@@ -172,19 +197,23 @@ const PG_UNIQUE_VIOLATION = "23505";
 /**
  * Live `StampStore` backed by a (service-role) Supabase client.
  *
- * Targets the TSK-148 schema: `stamp_cards.user_id` nullable + `phone` column,
- * `stamp_entries.ipos_tran_id` (unique) + `source`. See the migration in the
- * PR / README before running against a project that hasn't applied it.
+ * Targets the TSK-148 schema: `stamp_entries.ipos_tran_id` (unique) + `source`.
+ * Stamp cards keep the base shape (`user_id` NOT NULL) — every stamp belongs to
+ * a web account.
  */
 export function createSupabaseStampStore(supabase: SupabaseClient): StampStore {
   return {
-    async findUserIdByPhone(phone) {
+    async findVerifiedAccountByPhone(phone) {
+      // profiles.phone is set ONLY via the OTP-verified signup/reset flow, so a
+      // matching row == a verified mobile. created_at == the signup moment.
       const { data } = await supabase
         .from("profiles")
-        .select("id")
+        .select("id, created_at")
         .eq("phone", phone)
         .maybeSingle();
-      return data?.id ?? null;
+      if (!data) return null;
+      const signupAt = Date.parse(data.created_at);
+      return { userId: data.id, signupAt: Number.isNaN(signupAt) ? 0 : signupAt };
     },
 
     async hasEntryForTranId(tranId) {
@@ -197,24 +226,23 @@ export function createSupabaseStampStore(supabase: SupabaseClient): StampStore {
       return !!data;
     },
 
-    async findCollectingCard(owner) {
-      let q = supabase
+    async findCollectingCard(userId) {
+      const { data } = await supabase
         .from("stamp_cards")
         .select("id, stamps_collected, reward_status")
+        .eq("user_id", userId)
         .eq("reward_status", "collecting")
         .lt("stamps_collected", MAX_STAMPS)
         .order("created_at", { ascending: false })
-        .limit(1);
-      // Prefer the user-owned card when registered; otherwise the phone card.
-      q = owner.userId ? q.eq("user_id", owner.userId) : q.is("user_id", null).eq("phone", owner.phone);
-      const { data } = await q.maybeSingle();
+        .limit(1)
+        .maybeSingle();
       return (data as CardRow | null) ?? null;
     },
 
-    async createCard(owner) {
+    async createCard(userId) {
       const { data, error } = await supabase
         .from("stamp_cards")
-        .insert({ user_id: owner.userId, phone: owner.phone })
+        .insert({ user_id: userId })
         .select("id, stamps_collected, reward_status")
         .single();
       if (error || !data) {

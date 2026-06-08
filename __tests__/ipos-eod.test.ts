@@ -14,8 +14,8 @@ import { parseEodOrders, IPOS_STORE_UIDS, type ParsedOrder } from "@/lib/ipos/pa
 import {
   applyStamps,
   type StampStore,
-  type CardOwner,
   type CardRow,
+  type VerifiedAccount,
 } from "@/lib/ipos/applyStamps";
 
 const HN_STORE_ID = "store-hn-uuid";
@@ -116,38 +116,37 @@ test("parseEodOrders — handles envelope + stringified extra_data", () => {
   assert.equal(orders[0].phone, "0936336649");
 });
 
-/* ───────────────────────── applyStamps idempotency ───────────────────────── */
+/* ─────────────── applyStamps — eligibility + idempotency ─────────────── */
 
-type MemCard = CardRow & { user_id: string | null; phone: string };
+type MemCard = CardRow & { user_id: string };
 
-/** In-memory StampStore for deterministic idempotency/rollover tests. */
-function memStore(profiles: Record<string, string> = {}) {
+/**
+ * In-memory StampStore. `accounts` maps a verified phone → its account
+ * (userId + signupAt epoch ms). A phone absent from the map has no web account.
+ */
+function memStore(accounts: Record<string, VerifiedAccount> = {}) {
   const cards: MemCard[] = [];
   const entries: Array<{ card_id: string; ipos_tran_id: string; stamp_number: number }> = [];
   let seq = 0;
 
   const store: StampStore = {
-    async findUserIdByPhone(phone) {
-      return profiles[phone] ?? null;
+    async findVerifiedAccountByPhone(phone) {
+      return accounts[phone] ?? null;
     },
     async hasEntryForTranId(tranId) {
       return entries.some((e) => e.ipos_tran_id === tranId);
     },
-    async findCollectingCard(owner: CardOwner) {
+    async findCollectingCard(userId) {
       const matches = cards.filter(
-        (c) =>
-          c.reward_status === "collecting" &&
-          c.stamps_collected < 8 &&
-          (owner.userId ? c.user_id === owner.userId : c.user_id === null && c.phone === owner.phone),
+        (c) => c.user_id === userId && c.reward_status === "collecting" && c.stamps_collected < 8,
       );
       const c = matches[matches.length - 1];
       return c ? { id: c.id, stamps_collected: c.stamps_collected, reward_status: c.reward_status } : null;
     },
-    async createCard(owner: CardOwner) {
+    async createCard(userId) {
       const c: MemCard = {
         id: `card-${++seq}`,
-        user_id: owner.userId,
-        phone: owner.phone,
+        user_id: userId,
         stamps_collected: 0,
         reward_status: "collecting",
       };
@@ -175,47 +174,47 @@ function memStore(profiles: Record<string, string> = {}) {
   return { store, cards, entries };
 }
 
+const REG = "0936336649"; // registered + verified, signed up at t=100
+const acct = (signupAt: number): VerifiedAccount => ({ userId: "user-123", signupAt });
 function ord(tran_id: string, phone: string, tran_date: number): ParsedOrder {
   return { tran_id, tran_no: tran_id, store_id: HN_STORE_ID, phone, tran_date };
 }
 
-test("applyStamps — one stamp per attributable order", async () => {
-  const { store, entries } = memStore();
+test("applyStamps — stamps only registered+verified, post-signup orders", async () => {
+  const { store, entries, cards } = memStore({ [REG]: acct(100) });
   const orders = [
-    ord("o1", "0936336649", 1),
-    ord("o2", "0936336649", 2),
-    ord("o3", "0900000001", 3),
+    ord("o1", REG, 150), // ✓ post-signup
+    ord("o2", REG, 200), // ✓ post-signup
+    ord("o3", REG, 50), // ✗ pre-signup
+    ord("o4", "0900000001", 300), // ✗ no web account
   ];
   const s = await applyStamps(store, orders);
-  assert.equal(s.inserted, 3);
-  assert.equal(entries.length, 3);
-  assert.equal(s.newCards, 2); // two distinct phones → two cards
-  assert.equal(s.phoneOnly, 3); // none registered
-  assert.equal(s.linkedToProfile, 0);
+  assert.equal(s.inserted, 2);
+  assert.equal(entries.length, 2);
+  assert.equal(s.skippedPreSignup, 1);
+  assert.equal(s.skippedNoAccount, 1);
+  assert.equal(s.newCards, 1); // one customer → one card
+  assert.equal(cards[0].user_id, "user-123");
 });
 
 test("applyStamps — idempotent: same file twice = same stamp count", async () => {
-  const { store, entries } = memStore();
-  const orders = [
-    ord("o1", "0936336649", 1),
-    ord("o2", "0936336649", 2),
-    ord("o3", "0900000001", 3),
-  ];
+  const { store, entries } = memStore({ [REG]: acct(100) });
+  const orders = [ord("o1", REG, 150), ord("o2", REG, 200), ord("o3", "0900000001", 300)];
 
   const first = await applyStamps(store, orders);
-  assert.equal(first.inserted, 3);
+  assert.equal(first.inserted, 2);
   const countAfterFirst = entries.length;
 
   const second = await applyStamps(store, orders);
   assert.equal(second.inserted, 0);
-  assert.equal(second.skippedExisting, 3);
+  assert.equal(second.skippedExisting, 2);
   assert.equal(second.newCards, 0);
   assert.equal(entries.length, countAfterFirst, "re-import must not add entries");
 });
 
 test("applyStamps — heavy customer rolls over at 8 (no redemption)", async () => {
-  const { store, cards, entries } = memStore();
-  const orders = Array.from({ length: 10 }, (_, i) => ord(`o${i}`, "0936336649", i + 1));
+  const { store, cards, entries } = memStore({ [REG]: acct(0) });
+  const orders = Array.from({ length: 10 }, (_, i) => ord(`o${i}`, REG, i + 1));
   const s = await applyStamps(store, orders);
 
   assert.equal(s.inserted, 10);
@@ -227,10 +226,11 @@ test("applyStamps — heavy customer rolls over at 8 (no redemption)", async () 
   assert.equal(cards[1].reward_status, "collecting");
 });
 
-test("applyStamps — links to profile when phone is registered", async () => {
-  const { store, cards } = memStore({ "0936336649": "user-123" });
-  const s = await applyStamps(store, [ord("o1", "0936336649", 1), ord("o2", "0900000001", 2)]);
-  assert.equal(s.linkedToProfile, 1);
-  assert.equal(s.phoneOnly, 1);
-  assert.equal(cards.find((c) => c.phone === "0936336649")?.user_id, "user-123");
+test("applyStamps — unregistered phone earns nothing", async () => {
+  const { store, entries, cards } = memStore(); // no accounts
+  const s = await applyStamps(store, [ord("o1", REG, 150), ord("o2", "0900000001", 200)]);
+  assert.equal(s.inserted, 0);
+  assert.equal(s.skippedNoAccount, 2);
+  assert.equal(entries.length, 0);
+  assert.equal(cards.length, 0);
 });

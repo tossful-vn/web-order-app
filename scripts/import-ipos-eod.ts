@@ -92,11 +92,14 @@ async function main() {
   console.log(`  duplicate tran_ids  ${stats.duplicateTranIds}`);
 
   if (dryRun) {
-    console.log(`\n[dry-run] no DB writes. ~${distinctPhones} customers would get cards.`);
+    console.log(
+      `\n[dry-run] no DB writes. ${distinctPhones} phones with a real number;` +
+        ` only those with a registered + verified web account (post-signup) earn stamps.`,
+    );
     return;
   }
 
-  // 3. Apply stamps (idempotent).
+  // 3. Apply stamps (idempotent). Only registered + verified, post-signup orders.
   const store = createSupabaseStampStore(supabase!);
   const summary = await applyStamps(store, orders);
 
@@ -105,9 +108,9 @@ async function main() {
   console.log(`  attributable ...... ${summary.attributable}`);
   console.log(`  inserted .......... ${summary.inserted}`);
   console.log(`  skipped (existing)  ${summary.skippedExisting}`);
+  console.log(`  skipped (no acct) . ${summary.skippedNoAccount}`);
+  console.log(`  skipped (pre-signup)${summary.skippedPreSignup}`);
   console.log(`  new cards ......... ${summary.newCards}`);
-  console.log(`  linked to profile   ${summary.linkedToProfile}`);
-  console.log(`  phone-only ........ ${summary.phoneOnly}`);
   if (summary.errors) console.log(`  errors ............ ${summary.errors}`);
   console.log(
     `\n✓ done. Re-running this command imports 0 new stamps (idempotent on tran_id).`,
