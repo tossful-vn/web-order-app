@@ -33,6 +33,16 @@ export type Profile = {
   preferred_store: StoreCity | null;
   role: ProfileRole;
   zalo_oa_subscribed: boolean;
+  /**
+   * Consent capture for VN PDPL 2025 readiness (TSK-143).
+   * - transactional: order confirmations / receipts / account mail. Always TRUE
+   *   server-side — service operation needs it; surfaced read-only in /account.
+   * - marketing: promos / vouchers / events. Opt-IN (defaults FALSE).
+   * - updated_at: last time either consent changed.
+   */
+  consent_marketing: boolean;
+  consent_transactional: boolean;
+  consent_updated_at: string | null;
   locale: string;
   created_at: string;
   updated_at: string;

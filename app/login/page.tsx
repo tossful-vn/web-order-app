@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { signInWithPhone } from "@/lib/auth/phone-actions";
+import { signIn } from "@/lib/auth/phone-actions";
 import { getServerLang } from "@/lib/lang-server";
 import PasswordField from "@/lib/components/PasswordField.client";
 
@@ -8,7 +8,8 @@ const STRINGS = {
     metadata: "Sign in · Tossful",
     title: "Welcome back",
     sub: "Save your salads and plan your week.",
-    phone_ph: "Phone number (e.g. 0901234567)",
+    id_ph: "name@example.com or 0901234567",
+    id_label: "Email or phone",
     pwd: "Password",
     btn: "Sign in",
     forgot_link: "Forgot password?",
@@ -22,7 +23,8 @@ const STRINGS = {
     metadata: "Đăng nhập · Tossful",
     title: "Đăng nhập",
     sub: "Lưu salad của bạn và lên kế hoạch cho cả tuần.",
-    phone_ph: "Số điện thoại (ví dụ 0901234567)",
+    id_ph: "name@example.com hoặc 0901234567",
+    id_label: "Email hoặc số điện thoại",
     pwd: "Mật khẩu",
     btn: "Đăng nhập",
     forgot_link: "Quên mật khẩu?",
@@ -74,15 +76,20 @@ export default function LoginPage({
             <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm">{error}</div>
           )}
 
-          <form action={signInWithPhone} className="space-y-3">
+          <form action={signIn} className="space-y-3">
             <input type="hidden" name="next" value={next} />
+            <label htmlFor="identifier" className="sr-only">
+              {s.id_label}
+            </label>
             <input
-              name="phone"
-              type="tel"
-              inputMode="numeric"
+              id="identifier"
+              name="identifier"
+              type="text"
+              inputMode="email"
+              autoCapitalize="none"
               required
-              placeholder={s.phone_ph}
-              autoComplete="tel"
+              placeholder={s.id_ph}
+              autoComplete="username"
               className="w-full px-4 py-3 border border-kale-200 rounded-lg focus:outline-none focus:border-kale-500"
             />
             <PasswordField
