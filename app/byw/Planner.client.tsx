@@ -3,10 +3,23 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import {
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  MouseSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
 import { useLang } from "@/lib/lang";
 import { BYW_STR } from "./i18n";
 import MacroPanel from "@/lib/components/MacroPanel";
-import { addWeekItem, removeWeekItem } from "@/lib/weeks/actions";
+import { addWeekItem, deleteWeekItem, moveWeekItem, removeWeekItem } from "@/lib/weeks/actions";
+import { Draggable, Droppable, type DragData } from "./dnd";
+import BywDrawer from "./BywDrawer.client";
 
 type Macros = {
   kcal: number | null;
@@ -102,7 +115,20 @@ export default function Planner({ weekId: _weekId, items, savedBowls, addons, si
   // Optimistic add: when user picks an item, we insert it locally immediately
   // and clear when the server-refreshed `items` prop comes back in.
   const [optimisticItems, setOptimisticItems] = useState<WeekItemRow[]>([]);
-  useEffect(() => { setOptimisticItems([]); }, [items]);
+  // Optimistic DnD overrides: id → new day_index (move) and a set of removed ids.
+  const [movedOverrides, setMovedOverrides] = useState<Record<string, number>>({});
+  const [removedIds, setRemovedIds] = useState<Set<string>>(new Set());
+  // Click-to-place target armed by tapping a day card.
+  const [armedDay, setArmedDay] = useState<number | null>(null);
+  // Active drag payload (drives DragOverlay + drop-zone hints).
+  const [activeDrag, setActiveDrag] = useState<DragData | null>(null);
+
+  // Any time the server refreshes the item list, drop all optimistic layers.
+  useEffect(() => {
+    setOptimisticItems([]);
+    setMovedOverrides({});
+    setRemovedIds(new Set());
+  }, [items]);
 
   const [cName, setCName] = useState("");
   const [cKcal, setCKcal] = useState("");
@@ -111,14 +137,35 @@ export default function Planner({ weekId: _weekId, items, savedBowls, addons, si
   const [cCarbs, setCCarbs] = useState("");
   const [cFibre, setCFibre] = useState("");
 
+  // ── DnD sensors (backported from PR #9 fafc7f0) ───────────────────────────
+  // Drag starts only from a grip handle (the lone element with touch-action:none),
+  // so iOS Safari hands the press-hold to @dnd-kit instead of swallowing it, while
+  // the page + drawer keep scrolling. TouchSensor's short delay guards an
+  // accidental drag mid-scroll; mouse drags activate after 8px.
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 100, tolerance: 5 } }),
+    useSensor(KeyboardSensor),
+  );
+
+  // Effective items = server rows (minus optimistic removes, with optimistic
+  // moves applied) plus optimistic adds.
+  const effectiveItems = useMemo(() => {
+    const base = items
+      .filter((i) => !removedIds.has(i.id))
+      .map((i) => (movedOverrides[i.id] != null ? { ...i, day_index: movedOverrides[i.id] } : i));
+    const adds = optimisticItems.filter((i) => !removedIds.has(i.id));
+    return [...base, ...adds];
+  }, [items, optimisticItems, movedOverrides, removedIds]);
+
   const itemsByDay = useMemo(() => {
     const map: WeekItemRow[][] = [[], [], [], [], [], [], []];
-    for (const item of [...items, ...optimisticItems]) {
+    for (const item of effectiveItems) {
       const idx = Math.max(0, Math.min(6, item.day_index));
       map[idx].push(item);
     }
     return map;
-  }, [items, optimisticItems]);
+  }, [effectiveItems]);
 
   const dayTotals = useMemo(() => {
     return itemsByDay.map((dayItems) => {
@@ -130,6 +177,22 @@ export default function Planner({ weekId: _weekId, items, savedBowls, addons, si
       return t;
     });
   }, [itemsByDay]);
+
+  // Weekly macros summary — average across the days that have at least one item.
+  const weekAvg = useMemo(() => {
+    const filledDays = itemsByDay.filter((d) => d.length > 0).length;
+    const sum = dayTotals.reduce(
+      (a, t) => ({ cal: a.cal + t.cal, protein: a.protein + t.protein, fat: a.fat + t.fat, carbs: a.carbs + t.carbs }),
+      { cal: 0, protein: 0, fat: 0, carbs: 0 },
+    );
+    if (filledDays === 0) return null;
+    return {
+      cal: sum.cal / filledDays,
+      protein: sum.protein / filledDays,
+      fat: sum.fat / filledDays,
+      carbs: sum.carbs / filledDays,
+    };
+  }, [itemsByDay, dayTotals]);
 
   function closePicker() {
     setOpenDay(null);
@@ -207,269 +270,434 @@ export default function Planner({ weekId: _weekId, items, savedBowls, addons, si
     });
   }
 
+  // ── DnD mutations ─────────────────────────────────────────────────────────
+  function handleMove(id: string, toDay: number) {
+    setMovedOverrides((prev) => ({ ...prev, [id]: toDay }));
+    startTransition(async () => {
+      const res = await moveWeekItem({ id, toDayIndex: toDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
+      if ("error" in res) {
+        setMovedOverrides((prev) => { const n = { ...prev }; delete n[id]; return n; });
+        return;
+      }
+      router.refresh();
+    });
+  }
+
+  function handleRemoveById(id: string) {
+    setRemovedIds((prev) => new Set(prev).add(id));
+    startTransition(async () => {
+      const res = await deleteWeekItem(id);
+      if ("error" in res) {
+        setRemovedIds((prev) => { const n = new Set(prev); n.delete(id); return n; });
+        return;
+      }
+      router.refresh();
+    });
+  }
+
+  // Click-to-place from the drawer → armed day, else first empty day, else Monday.
+  function handleDrawerPick(bowlId: string) {
+    const firstEmpty = itemsByDay.findIndex((d) => d.length === 0);
+    const target = armedDay ?? (firstEmpty >= 0 ? firstEmpty : 0);
+    setArmedDay(null);
+    handleAdd({ dayIndex: target as 0 | 1 | 2 | 3 | 4 | 5 | 6, itemKind: "bowl", bowlId });
+  }
+
+  function toggleArm(day: number) {
+    setArmedDay((prev) => (prev === day ? null : day));
+  }
+
+  // ── DnD event handlers ────────────────────────────────────────────────────
+  function handleDragStart(e: DragStartEvent) {
+    setActiveDrag((e.active.data.current as DragData | undefined) ?? null);
+  }
+  function handleDragCancel() {
+    setActiveDrag(null);
+  }
+  function handleDragEnd(e: DragEndEvent) {
+    setActiveDrag(null);
+    const src = e.active.data.current as DragData | undefined;
+    const dst = e.over?.data.current as { type: "day"; dayIndex: number } | { type: "drawerZone" } | undefined;
+    if (!src || !dst) return; // dropped outside any droppable → no change
+
+    if (src.type === "drawerBowl") {
+      if (dst.type === "day") {
+        handleAdd({ dayIndex: dst.dayIndex as 0 | 1 | 2 | 3 | 4 | 5 | 6, itemKind: "bowl", bowlId: src.bowlId });
+      }
+      return;
+    }
+    // src.type === "dayItem"
+    if (dst.type === "drawerZone") {
+      handleRemoveById(src.itemId);
+    } else if (dst.type === "day" && dst.dayIndex !== src.dayIndex) {
+      handleMove(src.itemId, dst.dayIndex);
+    }
+  }
+
+  const dragActive = activeDrag !== null;
+  const dayItemDragActive = activeDrag?.type === "dayItem";
+
   const macroLabels = { cal: str.macro_cal, protein: str.macro_protein, fat: str.macro_fat, carbs: str.macro_carbs, fiber: str.macro_fiber };
 
   return (
-    <div className="byw-page">
-      <div className="byw-app">
-        <h1 className="byw-hero-h1">{str.page_title}</h1>
-        <p className="byw-hero-p">{str.page_sub}</p>
+    <DndContext
+      sensors={sensors}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
+    >
+      <div className="byw-page">
+        <div className="byw-app">
+          <h1 className="byw-hero-h1">{str.page_title}</h1>
+          <p className="byw-hero-p">{str.page_sub}</p>
 
-        {[0, 1, 2, 3, 4, 5, 6].map((d) => {
-          const dayItems = itemsByDay[d];
-          const isEmpty = dayItems.length === 0;
-          const totals = dayTotals[d];
-          return (
-            <div key={d} className={"day-card" + (isEmpty ? " empty" : "")}>
-              <div className="day-head">
-                <span className="day">{str.days[d]}</span>
-                {isEmpty ? (
-                  <span className="empty-tag">{str.empty_day}</span>
-                ) : (
-                  <span className="cal">{str.item_count(dayItems.length)}</span>
+          {weekAvg && (
+            <div className="byw-macros-banner">
+              <div className="hdr">{str.macros_header}</div>
+              <div className="row">
+                <span className="lbl">{str.avg_label}:</span>
+                <span>{Math.round(weekAvg.cal)} {str.macro_cal}</span>
+                <span className="dot">·</span>
+                <span>{Math.round(weekAvg.protein)}g {str.banner_protein}</span>
+                <span className="dot">·</span>
+                <span>{Math.round(weekAvg.fat)}g {str.banner_fat}</span>
+                <span className="dot">·</span>
+                <span>{Math.round(weekAvg.carbs)}g {str.banner_carb}</span>
+              </div>
+            </div>
+          )}
+
+          {[0, 1, 2, 3, 4, 5, 6].map((d) => {
+            const dayItems = itemsByDay[d];
+            const isEmpty = dayItems.length === 0;
+            const totals = dayTotals[d];
+            return (
+              <Droppable key={d} id={`byw-day:${d}`} data={{ type: "day", dayIndex: d }}>
+                {({ setNodeRef, isOver }) => (
+                  <div
+                    ref={setNodeRef}
+                    className={
+                      "day-card" +
+                      (isEmpty ? " empty" : "") +
+                      (armedDay === d ? " armed" : "") +
+                      (isOver ? " drop-over" : "") +
+                      (dragActive && isEmpty && !isOver ? " byw-day-pulse" : "")
+                    }
+                    onClick={() => toggleArm(d)}
+                  >
+                    <div className="day-head">
+                      <span className="day">{str.days[d]}</span>
+                      {isEmpty ? (
+                        <span className="empty-tag">{str.empty_day}</span>
+                      ) : (
+                        <span className="cal">{str.item_count(dayItems.length)}</span>
+                      )}
+                    </div>
+
+                    <MacroPanel
+                      totals={totals}
+                      label={str.week_label}
+                      macroLabels={macroLabels}
+                      dim={isEmpty}
+                    />
+
+                    {!isEmpty && (
+                      <div className="day-items">
+                        {dayItems.map((it) => {
+                          const m = macrosOf(it);
+                          const isTemp = it.id.startsWith("temp-");
+                          return (
+                            <Draggable
+                              key={it.id}
+                              id={`byw-item:${it.id}`}
+                              disabled={isTemp}
+                              data={{ type: "dayItem", itemId: it.id, dayIndex: d, kind: it.item_kind, name: nameOf(it, lang), cal: Math.round(m.cal) }}
+                            >
+                              {({ setNodeRef: setItemRef, setActivatorNodeRef, listeners, attributes, isDragging }) => (
+                                <div
+                                  ref={setItemRef}
+                                  className={"day-item " + it.item_kind + (isDragging ? " dragging" : "")}
+                                >
+                                  {isTemp ? (
+                                    <span className="byw-drag-handle disabled" aria-hidden="true">
+                                      <i className="ti ti-grip-vertical" />
+                                    </span>
+                                  ) : (
+                                    <button
+                                      ref={setActivatorNodeRef}
+                                      type="button"
+                                      className="byw-drag-handle"
+                                      aria-label={str.drag_handle}
+                                      onClick={(e) => e.stopPropagation()}
+                                      {...(listeners ?? {})}
+                                      {...attributes}
+                                    >
+                                      <i className="ti ti-grip-vertical" />
+                                    </button>
+                                  )}
+                                  <div className="ico">{iconOf(it.item_kind)}</div>
+                                  <span className="name">{nameOf(it, lang)}</span>
+                                  <span className="cal">{Math.round(m.cal)}</span>
+                                  {isTemp ? (
+                                    <button type="button" className="x-btn" disabled style={{ opacity: 0.4 }} aria-label={str.remove}>&times;</button>
+                                  ) : (
+                                    <form action={removeWeekItem} onClick={(e) => e.stopPropagation()}>
+                                      <input type="hidden" name="id" value={it.id} />
+                                      <button type="submit" className="x-btn" aria-label={str.remove}>&times;</button>
+                                    </form>
+                                  )}
+                                </div>
+                              )}
+                            </Draggable>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    <button
+                      className="add-item-btn"
+                      onClick={(e) => { e.stopPropagation(); setOpenDay(d); }}
+                    >
+                      + {isEmpty ? str.add_first : str.add_item}
+                    </button>
+                  </div>
                 )}
+              </Droppable>
+            );
+          })}
+        </div>
+
+        {/* Saved-bowls drawer — drag sources + drop-to-remove zone (TSK-141). */}
+        <div className="byw-drawer-dock">
+          <div className="byw-drawer-inner">
+            <BywDrawer
+              str={str}
+              bowls={savedBowls}
+              dayItemDragActive={dayItemDragActive}
+              armedDayLabel={armedDay !== null ? str.days[armedDay] : null}
+              onPick={handleDrawerPick}
+            />
+          </div>
+        </div>
+
+        {openDay !== null && (
+          <div className="picker-backdrop" onClick={closePicker}>
+            <div className="picker" onClick={(e) => e.stopPropagation()}>
+              <div className="picker-head">
+                <span className="title">{str.picker_add_to} {str.days[openDay]}</span>
+                <button type="button" className="close" onClick={closePicker} aria-label={str.picker_close}>&times;</button>
               </div>
 
-              <MacroPanel
-                totals={totals}
-                label={str.week_label}
-                macroLabels={macroLabels}
-                dim={isEmpty}
-              />
+              <div className="picker-tabs">
+                <button className={pickerTab === "bowl" ? "on" : ""} onClick={() => setPickerTab("bowl")}>{str.picker_my_bowls}</button>
+                <button className={pickerTab === "tossful" ? "on" : ""} onClick={() => setPickerTab("tossful")}>{str.picker_tossful}</button>
+                <button className={pickerTab === "drink" ? "on" : ""} onClick={() => setPickerTab("drink")}>{str.picker_drinks}</button>
+                <button className={pickerTab === "custom" ? "on" : ""} onClick={() => setPickerTab("custom")}>{str.picker_custom}</button>
+              </div>
 
-              {!isEmpty && (
-                <div className="day-items">
-                  {dayItems.map((it) => {
-                    const m = macrosOf(it);
-                    return (
-                      <div key={it.id} className={"day-item " + it.item_kind}>
-                        <div className="ico">{iconOf(it.item_kind)}</div>
-                        <span className="name">{nameOf(it, lang)}</span>
-                        <span className="cal">{Math.round(m.cal)}</span>
-                        {it.id.startsWith("temp-") ? (
-                          <button type="button" className="x-btn" disabled style={{ opacity: 0.4 }} aria-label={str.remove}>&times;</button>
-                        ) : (
-                          <form action={removeWeekItem}>
-                            <input type="hidden" name="id" value={it.id} />
-                            <button type="submit" className="x-btn" aria-label={str.remove}>&times;</button>
-                          </form>
-                        )}
+              <div className="picker-body">
+                {pickerErr && <div className="picker-err">{pickerErr}</div>}
+
+                {pickerTab === "bowl" && (
+                  <div className="picker-list">
+                    {savedBowls.length === 0 ? (
+                      <div className="picker-empty">
+                        <div className="msg">{str.picker_no_bowls}</div>
+                        <Link href="/nutrition">{str.picker_open_calc}</Link>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
+                    ) : (
+                      <>
+                        {(() => {
+                          const favs = savedBowls.filter((b) => b.is_favourite === true);
+                          const rest = savedBowls.filter((b) => b.is_favourite !== true);
+                          const renderBowl = (b: BowlMin) => (
+                            <button
+                              key={b.id}
+                              className="picker-option"
+                              disabled={busy}
+                              onClick={() => handleAdd({ dayIndex: openDay as 0|1|2|3|4|5|6, itemKind: "bowl", bowlId: b.id })}
+                            >
+                              <div className="ico">B</div>
+                              <div className="body">
+                                <div className="name">{b.name}</div>
+                                <div className="macros">{Math.round(Number(b.kcal ?? 0))} cal &middot; {Number(b.protein_g ?? 0).toFixed(0)}g protein</div>
+                              </div>
+                            </button>
+                          );
+                          return (
+                            <>
+                              {favs.length > 0 && (
+                                <>
+                                  <div className="picker-subheading">{str.must_try}</div>
+                                  {favs.map(renderBowl)}
+                                </>
+                              )}
+                              {rest.length > 0 && (
+                                <>
+                                  {favs.length > 0 && <div className="picker-subheading">{str.picker_saved_bowls}</div>}
+                                  {rest.map(renderBowl)}
+                                </>
+                              )}
+                            </>
+                          );
+                        })()}
+                      </>
+                    )}
+                  </div>
+                )}
 
-              <button className="add-item-btn" onClick={() => setOpenDay(d)}>
-                + {isEmpty ? str.add_first : str.add_item}
-              </button>
-            </div>
-          );
-        })}
-      </div>
-
-      {openDay !== null && (
-        <div className="picker-backdrop" onClick={closePicker}>
-          <div className="picker" onClick={(e) => e.stopPropagation()}>
-            <div className="picker-head">
-              <span className="title">{str.picker_add_to} {str.days[openDay]}</span>
-              <button type="button" className="close" onClick={closePicker} aria-label={str.picker_close}>&times;</button>
-            </div>
-
-            <div className="picker-tabs">
-              <button className={pickerTab === "bowl" ? "on" : ""} onClick={() => setPickerTab("bowl")}>{str.picker_my_bowls}</button>
-              <button className={pickerTab === "tossful" ? "on" : ""} onClick={() => setPickerTab("tossful")}>{str.picker_tossful}</button>
-              <button className={pickerTab === "drink" ? "on" : ""} onClick={() => setPickerTab("drink")}>{str.picker_drinks}</button>
-              <button className={pickerTab === "custom" ? "on" : ""} onClick={() => setPickerTab("custom")}>{str.picker_custom}</button>
-            </div>
-
-            <div className="picker-body">
-              {pickerErr && <div className="picker-err">{pickerErr}</div>}
-
-              {pickerTab === "bowl" && (
-                <div className="picker-list">
-                  {savedBowls.length === 0 ? (
-                    <div className="picker-empty">
-                      <div className="msg">{str.picker_no_bowls}</div>
-                      <Link href="/nutrition">{str.picker_open_calc}</Link>
-                    </div>
-                  ) : (
-                    <>
-                      {(() => {
-                        const favs = savedBowls.filter((b) => b.is_favourite === true);
-                        const rest = savedBowls.filter((b) => b.is_favourite !== true);
-                        const renderBowl = (b: BowlMin) => (
-                          <button
-                            key={b.id}
-                            className="picker-option"
-                            disabled={busy}
-                            onClick={() => handleAdd({ dayIndex: openDay as 0|1|2|3|4|5|6, itemKind: "bowl", bowlId: b.id })}
-                          >
-                            <div className="ico">B</div>
-                            <div className="body">
-                              <div className="name">{b.name}</div>
-                              <div className="macros">{Math.round(Number(b.kcal ?? 0))} cal &middot; {Number(b.protein_g ?? 0).toFixed(0)}g protein</div>
-                            </div>
-                          </button>
-                        );
-                        return (
-                          <>
-                            {favs.length > 0 && (
-                              <>
-                                <div className="picker-subheading">{str.must_try}</div>
-                                {favs.map(renderBowl)}
-                              </>
-                            )}
-                            {rest.length > 0 && (
-                              <>
-                                {favs.length > 0 && <div className="picker-subheading">{str.picker_saved_bowls}</div>}
-                                {rest.map(renderBowl)}
-                              </>
-                            )}
-                          </>
-                        );
-                      })()}
-                    </>
-                  )}
-                </div>
-              )}
-
-              {pickerTab === "drink" && (
-                <div className="picker-list">
-                  {addons.filter((a) => a.kind === "drink").map((a) => (
-                    <button
-                      key={a.id}
-                      className="picker-option"
-                      disabled={busy}
-                      onClick={() => handleAdd({ dayIndex: openDay as 0|1|2|3|4|5|6, itemKind: "drink", addonId: a.id })}
-                    >
-                      <div className="ico" style={{ background: "#F68C02", color: "#fff" }}>D</div>
-                      <div className="body">
-                        <div className="name">{(lang === "vi" && a.name_vn) ? a.name_vn : a.name_en}</div>
-                        <div className="macros">{Math.round(Number(a.kcal ?? 0))} cal &middot; {Number(a.protein_g ?? 0).toFixed(0)}g protein</div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {pickerTab === "tossful" && (
-                <div className="picker-list">
-                  {(() => {
-                    // Split signatures by wrap suffix; group with addons.
-                    const isWrapName = (n: string) => /\s*-\s*Wrap\s*$/i.test(n);
-                    const displayName = (n: string) => {
-                      const m = n.match(/^(.+?)\s*-\s*Wrap\s*$/i);
-                      return m ? `WRAP | ${m[1].trim()}` : n;
-                    };
-                    const sigBowls = signatures.filter((sg) => !isWrapName(sg.name_en));
-                    const sigWraps = signatures.filter((sg) => isWrapName(sg.name_en));
-                    const addonWraps = addons.filter((a) => a.kind === "wrap");
-                    const sides = addons.filter((a) => a.kind === "side");
-
-                    const renderSig = (sg: Signature) => (
+                {pickerTab === "drink" && (
+                  <div className="picker-list">
+                    {addons.filter((a) => a.kind === "drink").map((a) => (
                       <button
-                        key={`sig-${sg.id}`}
+                        key={a.id}
                         className="picker-option"
                         disabled={busy}
-                        onClick={() => handleAdd({
-                          dayIndex: openDay as 0|1|2|3|4|5|6,
-                          itemKind: "custom",
-                          customName: (lang === "vi" && sg.name_vn) ? sg.name_vn : displayName(sg.name_en),
-                          customKcal: sg.kcal,
-                          customProteinG: sg.protein_g,
-                          customFatG: sg.fat_g,
-                          customCarbsG: sg.carbs_g,
-                          customFibreG: sg.fibre_g,
-                        })}
+                        onClick={() => handleAdd({ dayIndex: openDay as 0|1|2|3|4|5|6, itemKind: "drink", addonId: a.id })}
                       >
-                        <div className="ico" style={{ background: "#C0DD97", color: "#0F563D" }}>B</div>
-                        <div className="body">
-                          <div className="name">{(lang === "vi" && sg.name_vn) ? sg.name_vn : displayName(sg.name_en)}</div>
-                          <div className="macros">{sg.kcal} cal &middot; {sg.protein_g.toFixed(0)}g protein</div>
-                        </div>
-                      </button>
-                    );
-                    const renderAddon = (a: AddonMin, label: string, bg: string, fg: string) => (
-                      <button
-                        key={`${a.kind}-${a.id}`}
-                        className="picker-option"
-                        disabled={busy}
-                        onClick={() => handleAdd({ dayIndex: openDay as 0|1|2|3|4|5|6, itemKind: a.kind, addonId: a.id })}
-                      >
-                        <div className="ico" style={{ background: bg, color: fg }}>{label}</div>
+                        <div className="ico" style={{ background: "#F68C02", color: "#fff" }}>D</div>
                         <div className="body">
                           <div className="name">{(lang === "vi" && a.name_vn) ? a.name_vn : a.name_en}</div>
                           <div className="macros">{Math.round(Number(a.kcal ?? 0))} cal &middot; {Number(a.protein_g ?? 0).toFixed(0)}g protein</div>
                         </div>
                       </button>
-                    );
+                    ))}
+                  </div>
+                )}
 
-                    return (
-                      <>
-                        {sigBowls.length > 0 && (
-                          <>
-                            <div className="picker-subheading">{str.picker_sub_bowls}</div>
-                            {sigBowls.map(renderSig)}
-                          </>
-                        )}
-                        {(sigWraps.length > 0 || addonWraps.length > 0) && (
-                          <>
-                            <div className="picker-subheading">{str.picker_sub_wraps}</div>
-                            {sigWraps.map(renderSig)}
-                            {addonWraps.map((a) => renderAddon(a, "W", "#FFE9C2", "#7D291A"))}
-                          </>
-                        )}
-                        {sides.length > 0 && (
-                          <>
-                            <div className="picker-subheading">{str.picker_sub_sides}</div>
-                            {sides.map((a) => renderAddon(a, "S", "#F8E3F3", "#7D291A"))}
-                          </>
-                        )}
-                      </>
-                    );
-                  })()}
-                </div>
-              )}
+                {pickerTab === "tossful" && (
+                  <div className="picker-list">
+                    {(() => {
+                      // Split signatures by wrap suffix; group with addons.
+                      const isWrapName = (n: string) => /\s*-\s*Wrap\s*$/i.test(n);
+                      const displayName = (n: string) => {
+                        const m = n.match(/^(.+?)\s*-\s*Wrap\s*$/i);
+                        return m ? `WRAP | ${m[1].trim()}` : n;
+                      };
+                      const sigBowls = signatures.filter((sg) => !isWrapName(sg.name_en));
+                      const sigWraps = signatures.filter((sg) => isWrapName(sg.name_en));
+                      const addonWraps = addons.filter((a) => a.kind === "wrap");
+                      const sides = addons.filter((a) => a.kind === "side");
 
-              {pickerTab === "custom" && (
-                <form className="custom-form" onSubmit={handleAddCustom}>
-                  <div>
-                    <label>{str.custom_name_label}</label>
-                    <input type="text" value={cName} onChange={(e) => setCName(e.target.value)} placeholder={str.custom_name_ph} maxLength={80} required />
+                      const renderSig = (sg: Signature) => (
+                        <button
+                          key={`sig-${sg.id}`}
+                          className="picker-option"
+                          disabled={busy}
+                          onClick={() => handleAdd({
+                            dayIndex: openDay as 0|1|2|3|4|5|6,
+                            itemKind: "custom",
+                            customName: (lang === "vi" && sg.name_vn) ? sg.name_vn : displayName(sg.name_en),
+                            customKcal: sg.kcal,
+                            customProteinG: sg.protein_g,
+                            customFatG: sg.fat_g,
+                            customCarbsG: sg.carbs_g,
+                            customFibreG: sg.fibre_g,
+                          })}
+                        >
+                          <div className="ico" style={{ background: "#C0DD97", color: "#0F563D" }}>B</div>
+                          <div className="body">
+                            <div className="name">{(lang === "vi" && sg.name_vn) ? sg.name_vn : displayName(sg.name_en)}</div>
+                            <div className="macros">{sg.kcal} cal &middot; {sg.protein_g.toFixed(0)}g protein</div>
+                          </div>
+                        </button>
+                      );
+                      const renderAddon = (a: AddonMin, label: string, bg: string, fg: string) => (
+                        <button
+                          key={`${a.kind}-${a.id}`}
+                          className="picker-option"
+                          disabled={busy}
+                          onClick={() => handleAdd({ dayIndex: openDay as 0|1|2|3|4|5|6, itemKind: a.kind, addonId: a.id })}
+                        >
+                          <div className="ico" style={{ background: bg, color: fg }}>{label}</div>
+                          <div className="body">
+                            <div className="name">{(lang === "vi" && a.name_vn) ? a.name_vn : a.name_en}</div>
+                            <div className="macros">{Math.round(Number(a.kcal ?? 0))} cal &middot; {Number(a.protein_g ?? 0).toFixed(0)}g protein</div>
+                          </div>
+                        </button>
+                      );
+
+                      return (
+                        <>
+                          {sigBowls.length > 0 && (
+                            <>
+                              <div className="picker-subheading">{str.picker_sub_bowls}</div>
+                              {sigBowls.map(renderSig)}
+                            </>
+                          )}
+                          {(sigWraps.length > 0 || addonWraps.length > 0) && (
+                            <>
+                              <div className="picker-subheading">{str.picker_sub_wraps}</div>
+                              {sigWraps.map(renderSig)}
+                              {addonWraps.map((a) => renderAddon(a, "W", "#FFE9C2", "#7D291A"))}
+                            </>
+                          )}
+                          {sides.length > 0 && (
+                            <>
+                              <div className="picker-subheading">{str.picker_sub_sides}</div>
+                              {sides.map((a) => renderAddon(a, "S", "#F8E3F3", "#7D291A"))}
+                            </>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
-                  <div>
-                    <label>{str.custom_kcal_label}</label>
-                    <input type="number" min="0" max="3000" value={cKcal} onChange={(e) => setCKcal(e.target.value)} placeholder="0" />
-                  </div>
-                  <div className="row2">
+                )}
+
+                {pickerTab === "custom" && (
+                  <form className="custom-form" onSubmit={handleAddCustom}>
                     <div>
-                      <label>{str.custom_protein_label}</label>
-                      <input type="number" min="0" max="500" step="0.1" value={cProtein} onChange={(e) => setCProtein(e.target.value)} placeholder="0" />
+                      <label>{str.custom_name_label}</label>
+                      <input type="text" value={cName} onChange={(e) => setCName(e.target.value)} placeholder={str.custom_name_ph} maxLength={80} required />
                     </div>
                     <div>
-                      <label>{str.custom_fat_label}</label>
-                      <input type="number" min="0" max="500" step="0.1" value={cFat} onChange={(e) => setCFat(e.target.value)} placeholder="0" />
+                      <label>{str.custom_kcal_label}</label>
+                      <input type="number" min="0" max="3000" value={cKcal} onChange={(e) => setCKcal(e.target.value)} placeholder="0" />
                     </div>
-                  </div>
-                  <div className="row2">
-                    <div>
-                      <label>{str.custom_carbs_label}</label>
-                      <input type="number" min="0" max="500" step="0.1" value={cCarbs} onChange={(e) => setCCarbs(e.target.value)} placeholder="0" />
+                    <div className="row2">
+                      <div>
+                        <label>{str.custom_protein_label}</label>
+                        <input type="number" min="0" max="500" step="0.1" value={cProtein} onChange={(e) => setCProtein(e.target.value)} placeholder="0" />
+                      </div>
+                      <div>
+                        <label>{str.custom_fat_label}</label>
+                        <input type="number" min="0" max="500" step="0.1" value={cFat} onChange={(e) => setCFat(e.target.value)} placeholder="0" />
+                      </div>
                     </div>
-                    <div>
-                      <label>{str.custom_fibre_label}</label>
-                      <input type="number" min="0" max="500" step="0.1" value={cFibre} onChange={(e) => setCFibre(e.target.value)} placeholder="0" />
+                    <div className="row2">
+                      <div>
+                        <label>{str.custom_carbs_label}</label>
+                        <input type="number" min="0" max="500" step="0.1" value={cCarbs} onChange={(e) => setCCarbs(e.target.value)} placeholder="0" />
+                      </div>
+                      <div>
+                        <label>{str.custom_fibre_label}</label>
+                        <input type="number" min="0" max="500" step="0.1" value={cFibre} onChange={(e) => setCFibre(e.target.value)} placeholder="0" />
+                      </div>
                     </div>
-                  </div>
-                  <button type="submit" className="submit" disabled={busy}>{str.custom_save}</button>
-                </form>
-              )}
+                    <button type="submit" className="submit" disabled={busy}>{str.custom_save}</button>
+                  </form>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+
+      {/* Drag ghost — follows the pointer/finger during a drag. */}
+      <DragOverlay dropAnimation={null}>
+        {activeDrag ? (
+          <div className="byw-drag-overlay">
+            <i className="ti ti-grip-vertical" />
+            <span className="name">
+              {activeDrag.type === "drawerBowl"
+                ? (savedBowls.find((b) => b.id === activeDrag.bowlId)?.name ?? "Bowl")
+                : activeDrag.name}
+            </span>
+            {activeDrag.type === "dayItem" && <span className="cal">{activeDrag.cal}</span>}
+          </div>
+        ) : null}
+      </DragOverlay>
+    </DndContext>
   );
 }
 // trailing buffer

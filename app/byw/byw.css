@@ -1,5 +1,14 @@
 .byw-page { background: #faf7f0; min-height: 100vh; font-family: 'Questrial', system-ui, sans-serif; color: #1f2a1d; padding-top: 1px; /* prevent margin-collapse leaking body bg into the first 18px */ }
-.byw-app { max-width: 480px; margin: 0 auto; padding: 0 0 32px; }
+/* Bottom padding clears the sticky saved-bowls drawer dock so the last day card
+   is never hidden behind it. */
+.byw-app { max-width: 480px; margin: 0 auto; padding: 0 0 200px; }
+
+/* === Weekly macros summary banner (ported from /plan, TSK-141) === */
+.byw-macros-banner { background: #0F563D; color: #F4F1E6; border-radius: 14px; margin: 0 16px 14px; padding: 10px 14px; box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
+.byw-macros-banner .hdr { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: #C0DD97; font-weight: 500; }
+.byw-macros-banner .row { margin-top: 3px; font-size: 13px; font-weight: 500; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
+.byw-macros-banner .row .lbl { color: #C0DD97; }
+.byw-macros-banner .row .dot { color: #6f9a82; }
 
 .byw-hero-h1 { font-family: 'Fraunces', serif; font-style: italic; font-weight: 300; font-size: 26px; line-height: 1.05; color: #0F563D; margin: 18px 20px 4px; letter-spacing: -0.5px; }
 .byw-hero-p { font-size: 12px; color: #5F5E5A; margin: 0 20px 12px; line-height: 1.5; }
@@ -28,6 +37,52 @@
 .day-item .cal { font-size: 10px; color: #5F5E5A; font-family: 'Fraunces', serif; font-style: italic; }
 .day-item .x-btn { background: transparent; border: 0; color: #bbb; cursor: pointer; padding: 0 4px; font-size: 13px; line-height: 1; }
 .day-item .x-btn:hover { color: #7D291A; }
+.day-item.dragging { opacity: 0.4; }
+
+/* === Drag & drop (backported from closed PR #9 fafc7f0, TSK-141) === */
+/* The card body / page / drawer keep default touch-action so taps + horizontal
+   scroll still work; the grip handle alone carries touch-action:none so iOS
+   Safari hands the press-hold to @dnd-kit instead of swallowing it. */
+.day-card, .byw-drawer-card { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.byw-drag-handle { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; flex-shrink: 0; border: 0; background: transparent; color: #9fb6a0; border-radius: 6px; font-size: 15px; padding: 0; touch-action: none; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; cursor: grab; }
+.byw-drag-handle:active { cursor: grabbing; background: rgba(15,86,61,0.08); }
+.byw-drag-handle.disabled { cursor: default; opacity: 0.3; }
+@media (hover: hover) { .byw-drag-handle { opacity: 0.5; transition: opacity 0.15s; } .day-item:hover .byw-drag-handle, .byw-drawer-card:hover .byw-drag-handle { opacity: 1; } }
+
+/* Day card as a drop target. */
+.day-card.drop-over { border-color: #0F563D; box-shadow: 0 0 0 2px #0F563D inset; background: rgba(15,86,61,0.04); }
+.day-card.armed { border-color: #0F563D; box-shadow: 0 0 0 2px rgba(15,86,61,0.25) inset; }
+@keyframes byw-day-pulse { 0%,100% { border-color: rgba(15,86,61,0.25); } 50% { border-color: #0F563D; background: rgba(15,86,61,0.04); } }
+.day-card.byw-day-pulse { animation: byw-day-pulse 1.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .day-card.byw-day-pulse { animation: none; border-color: #0F563D; } }
+
+/* Drag ghost following the pointer. */
+.byw-drag-overlay { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 10px; background: #fff; box-shadow: 0 8px 24px rgba(15,86,61,0.22); font-size: 12px; color: #1f2a1d; max-width: 260px; }
+.byw-drag-overlay .ti { color: #9fb6a0; font-size: 15px; }
+.byw-drag-overlay .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.byw-drag-overlay .cal { font-size: 10px; color: #5F5E5A; font-family: 'Fraunces', serif; font-style: italic; }
+
+/* === Saved-bowls drawer dock (sticky bottom) === */
+.byw-drawer-dock { position: sticky; bottom: 0; z-index: 30; background: linear-gradient(to top, #faf7f0 70%, rgba(250,247,240,0)); padding: 8px 0 10px; }
+.byw-drawer-inner { max-width: 480px; margin: 0 auto; padding: 0 16px; }
+.byw-drawer { background: #fff; border: 0.5px solid rgba(0,0,0,0.10); border-radius: 14px; padding: 8px 10px; transition: border-color 0.15s, box-shadow 0.15s; }
+.byw-drawer.remove-hint { border-style: dashed; border-color: #0F563D; }
+.byw-drawer.remove-armed { border-color: #7D291A; box-shadow: 0 0 0 2px #7D291A inset; background: rgba(125,41,26,0.04); }
+.byw-drawer-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.byw-drawer-head .title { font-family: 'Fraunces', serif; font-style: italic; font-size: 13px; color: #0F563D; font-weight: 500; }
+.byw-drawer-head .hint { font-size: 10px; color: #5F5E5A; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.byw-drawer-empty { font-size: 11px; color: #5F5E5A; padding: 4px 2px 6px; display: flex; flex-direction: column; gap: 6px; }
+.byw-drawer-empty a { color: #0F563D; font-weight: 500; text-decoration: underline; text-underline-offset: 2px; display: inline-flex; align-items: center; gap: 4px; }
+.byw-drawer-row { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; padding-bottom: 2px; }
+.byw-drawer-row::-webkit-scrollbar { display: none; }
+.byw-drawer-card { position: relative; flex: 0 0 auto; width: 132px; display: flex; align-items: center; gap: 6px; padding: 6px 7px; border: 0.5px solid rgba(0,0,0,0.08); border-radius: 10px; background: #F4F1E6; cursor: pointer; }
+.byw-drawer-card:active { background: rgba(15,86,61,0.06); }
+.byw-drawer-card.dragging { opacity: 0.4; }
+.byw-drawer-card .byw-drag-handle.drawer { width: 22px; height: 22px; font-size: 13px; }
+.byw-drawer-card .thumb { width: 26px; height: 26px; flex-shrink: 0; border-radius: 7px; background: #0F563D; color: #F4F1E6; display: flex; align-items: center; justify-content: center; font-family: 'Fraunces', serif; font-style: italic; font-size: 13px; }
+.byw-drawer-card .meta { min-width: 0; flex: 1; }
+.byw-drawer-card .meta .name { font-size: 11px; color: #1f2a1d; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.byw-drawer-card .meta .macros { font-size: 9px; color: #5F5E5A; font-family: 'Fraunces', serif; font-style: italic; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .empty-day-note { text-align: center; font-size: 10px; color: #aaa; padding: 4px 0 6px; font-style: italic; }
 

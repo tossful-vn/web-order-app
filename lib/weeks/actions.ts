@@ -120,6 +120,64 @@ export async function addWeekItem(input: {
   return { id: data.id };
 }
 
+/**
+ * Move an existing week_item to a different day (DnD day→day, TSK-141).
+ * The item is appended to the end of the target day's stack (next sort_order).
+ * No-op when the item is already on the target day.
+ */
+export async function moveWeekItem(input: {
+  id: string;
+  toDayIndex: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+}): Promise<{ ok: true } | { error: string }> {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  // Load the item to learn its week + current day (and confirm ownership via RLS).
+  const { data: item, error: getErr } = await supabase
+    .from("week_items")
+    .select("id, week_id, day_index")
+    .eq("id", input.id)
+    .single();
+  if (getErr) return { error: getErr.message };
+  if (item.day_index === input.toDayIndex) return { ok: true };
+
+  // Compute next sort_order on the target day so the item lands at the bottom.
+  const { data: existing, error: cntErr } = await supabase
+    .from("week_items")
+    .select("sort_order")
+    .eq("week_id", item.week_id)
+    .eq("day_index", input.toDayIndex)
+    .order("sort_order", { ascending: false })
+    .limit(1);
+  if (cntErr) return { error: cntErr.message };
+  const nextSort = (existing?.[0]?.sort_order ?? -1) + 1;
+
+  const { error } = await supabase
+    .from("week_items")
+    .update({ day_index: input.toDayIndex, sort_order: nextSort })
+    .eq("id", input.id);
+  if (error) return { error: error.message };
+
+  revalidatePath("/byw");
+  return { ok: true };
+}
+
+/**
+ * Remove a single week_item by id (programmatic — used by DnD drop-to-remove).
+ * The form-bound `removeWeekItem` below delegates here.
+ */
+export async function deleteWeekItem(id: string): Promise<{ ok: true } | { error: string }> {
+  if (!id) return { error: "Missing id" };
+  const supabase = createClient();
+  const { error } = await supabase.from("week_items").delete().eq("id", id);
+  if (error) return { error: error.message };
+  revalidatePath("/byw");
+  return { ok: true };
+}
+
 /** Form-bound: remove a single week_item by id. */
 export async function removeWeekItem(formData: FormData): Promise<void> {
   const id = String(formData.get("id") ?? "");
