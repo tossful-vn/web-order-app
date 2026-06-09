@@ -2,6 +2,7 @@ import Link from "next/link";
 import { signIn } from "@/lib/auth/phone-actions";
 import { getServerLang } from "@/lib/lang-server";
 import PasswordField from "@/lib/components/PasswordField.client";
+import ForgotLink from "./ForgotLink.client";
 
 const STRINGS = {
   en: {
@@ -48,11 +49,11 @@ export default function LoginPage({
   const s = STRINGS[getServerLang()];
   const error = searchParams.error;
   const next = searchParams.next ?? "";
-  const resetSuccess = searchParams.reset === "success";
+  // TSK-144 redirects with reset=1; keep "success" for any older links.
+  const resetSuccess =
+    searchParams.reset === "1" || searchParams.reset === "success";
 
   const signupHref = "/signup" + (next ? "?next=" + encodeURIComponent(next) : "");
-  const resetHref =
-    "/reset-password" + (next ? "?next=" + encodeURIComponent(next) : "");
 
   return (
     <main className="min-h-screen flex items-center justify-center p-6">
@@ -110,9 +111,7 @@ export default function LoginPage({
 
           <div className="mt-5 text-center text-sm text-kale-600 space-y-2">
             <div>
-              <Link href={resetHref} className="text-kale-700 underline">
-                {s.forgot_link}
-              </Link>
+              <ForgotLink label={s.forgot_link} next={next || undefined} />
             </div>
             <div>
               {s.no_account_pre}{" "}

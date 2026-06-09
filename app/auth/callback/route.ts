@@ -15,8 +15,15 @@ export async function GET(request: Request) {
   const code = searchParams.get("code");
   const next = searchParams.get("next") ?? "/account";
 
+  // Password-recovery links land here too (TSK-144). On any failure send the
+  // user to /reset-password's expired state instead of a generic login error.
+  const isReset = next.startsWith("/reset-password");
+  const failUrl = isReset
+    ? `${origin}/reset-password?expired=1`
+    : `${origin}/login?error=missing_code`;
+
   if (!code) {
-    return NextResponse.redirect(`${origin}/login?error=missing_code`);
+    return NextResponse.redirect(failUrl);
   }
 
   const supabase = createClient();
@@ -24,7 +31,9 @@ export async function GET(request: Request) {
 
   if (error) {
     return NextResponse.redirect(
-      `${origin}/login?error=${encodeURIComponent(error.message)}`
+      isReset
+        ? `${origin}/reset-password?expired=1`
+        : `${origin}/login?error=${encodeURIComponent(error.message)}`
     );
   }
 

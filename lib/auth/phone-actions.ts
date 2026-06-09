@@ -204,7 +204,11 @@ export async function signInWithPhone(formData: FormData): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// RESET — step 1: phone -> OTP request
+// RESET (phone OTP) — DEPRECATED by TSK-144. Password reset is now email-only
+// (/forgot-password -> /reset-password via Supabase recovery link). These two
+// actions are no longer wired to any page and OTP delivery is still stubbed
+// (Zalo ZNS, TSK-149). Kept inert for reference; safe to delete once TSK-149
+// lands or is dropped. Phone-only accounts recover by contacting Tossful.
 // ---------------------------------------------------------------------------
 export async function requestResetOtp(formData: FormData): Promise<void> {
   const phone = normalizePhone(String(formData.get("phone") ?? ""));

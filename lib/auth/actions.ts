@@ -89,57 +89,79 @@ export async function changePassword(formData: FormData): Promise<void> {
 }
 
 /**
- * "Forgot password" flow step 1: send a recovery email via Resend SMTP.
- * The email contains a link to /auth/callback?next=/auth/reset-password
- * which exchanges the recovery code for a short-lived session.
+ * "Forgot password" flow step 1 (TSK-144): send a recovery email via Resend SMTP.
+ * The email links to /auth/callback?next=/reset-password which exchanges the
+ * recovery code for a short-lived session, then lands on /reset-password.
+ *
+ * Errors are mapped to short codes (not raw messages) so the /forgot-password
+ * page can render BR-86 diacritic strings in the active language.
  */
 export async function requestPasswordReset(formData: FormData): Promise<void> {
   const email = String(formData.get("email") ?? "").trim();
+
+  // Empty -> ask for an email.
   if (!email) {
-    redirect("/login?mode=forgot&error=" + encodeURIComponent(MSG_EMAIL_REQUIRED));
+    redirect("/forgot-password?error=email_required");
+  }
+  // No "@" -> they typed a phone. Reset needs a REAL email; phone-only accounts
+  // are backed by a synthetic <phone>@phone.tossful.local that can't receive mail.
+  if (!email.includes("@")) {
+    redirect("/forgot-password?needsEmail=1&id=" + encodeURIComponent(email));
   }
 
   const supabase = createClient();
   const origin = headers().get("origin") ?? "https://web-order-app.vercel.app";
 
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: origin + "/auth/callback?next=/auth/reset-password",
+    redirectTo: origin + "/auth/callback?next=/reset-password",
   });
+  // Never reveal whether the account exists (no enumeration): show the SAME
+  // "sent" state on success and on error (rate-limit / transient). Log for ops.
   if (error) {
-    redirect("/login?mode=forgot&error=" + encodeURIComponent(error.message));
+    console.warn("[requestPasswordReset] resetPasswordForEmail error:", error.message);
   }
-  redirect("/login?mode=forgot&sent=1");
+  redirect("/forgot-password?sent=1");
 }
 
 /**
- * "Forgot password" flow step 2: user clicked the recovery link, has a
- * short-lived session, now sets a new password. Sign them out after so
- * they log in fresh with the new credentials.
+ * "Forgot password" flow step 2 (TSK-144): user clicked the recovery link,
+ * /auth/callback established a short-lived recovery session, and they now set a
+ * new password. Sign them out after so they log in fresh with the new password.
+ *
+ * Client-side validation (length + match) lives in ResetPasswordForm.client;
+ * these checks are the server-side backstop. Error codes map to localized
+ * strings on /reset-password.
  */
 export async function setNewPassword(formData: FormData): Promise<void> {
   const newPassword = String(formData.get("new_password") ?? "");
   const confirmPassword = String(formData.get("confirm_password") ?? "");
 
-  if (!newPassword) {
-    redirect("/auth/reset-password?error=" + encodeURIComponent(MSG_PASSWORD_REQUIRED));
-  }
-  if (newPassword.length < 8) {
-    redirect("/auth/reset-password?error=" + encodeURIComponent(MSG_PASSWORD_TOO_SHORT));
+  if (!newPassword || newPassword.length < 8) {
+    redirect("/reset-password?error=weak");
   }
   if (newPassword !== confirmPassword) {
-    redirect("/auth/reset-password?error=" + encodeURIComponent(MSG_PASSWORDS_DONT_MATCH));
+    redirect("/reset-password?error=mismatch");
   }
 
   const supabase = createClient();
+  // Must hold a live recovery session (set by /auth/callback). If it's gone the
+  // link was expired/invalid or already consumed.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    redirect("/reset-password?expired=1");
+  }
+
   const { error } = await supabase.auth.updateUser({ password: newPassword });
   if (error) {
-    redirect("/auth/reset-password?error=" + encodeURIComponent(error.message));
+    redirect("/reset-password?error=update_failed");
   }
 
   // Sign out so the user must log in fresh with the new password.
   await supabase.auth.signOut();
   revalidatePath("/", "layout");
-  redirect("/login?reset=success");
+  redirect("/login?reset=1");
 }
 
 /** Google OAuth — kept for future use (button hidden in UI for v1). */
