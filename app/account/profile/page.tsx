@@ -4,6 +4,7 @@ import { getServerLang } from "@/lib/lang-server";
 import type { Profile, StoreCity } from "@/lib/types/database";
 import StoreToggle from "./StoreToggle.client";
 import ConsentToggle from "./ConsentToggle.client";
+import PhoneVerify from "./PhoneVerify.client";
 
 const STRINGS = {
   en: {
@@ -106,6 +107,14 @@ export default async function ProfilePage() {
       {/* Communications consent (TSK-143) — marketing toggle + read-only
           transactional status. Persists on tap with its own toast. */}
       <ConsentToggle initialMarketing={p.consent_marketing === true} lang={lang} />
+
+      {/* Retroactive phone verification via Zalo OTP (TSK-149). Verifying links
+          historical iPOS BYO bowls recorded against the phone to this account. */}
+      <PhoneVerify
+        initialVerified={p.phone_verified === true}
+        initialPhone={p.phone ?? ""}
+        lang={lang}
+      />
 
       <section className="pt-8 border-t border-kale-100 text-sm text-kale-500">
         <p>{s.signed_in_pre} <strong className="text-kale-700">{user!.email}</strong></p>
