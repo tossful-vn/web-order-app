@@ -21,9 +21,10 @@ const VI = {
   mock_hint: "(chế độ thử — xem mã trong log máy chủ)",
   ok_title: "Đã xác minh thành công!",
   linked_bowls: "bowl đã được liên kết vào tài khoản",
+  linked_stamps: "tem đã được khôi phục từ các đơn cũ",
   linked_none: "Không có dữ liệu cũ nào để liên kết.",
   stamps_note:
-    "Tem cũ không thể khôi phục từ dữ liệu đã lưu — từ giờ các đơn của bạn sẽ tự tính tem.",
+    "Các đơn mua tại quầy trước đây đã được tính tem — từ giờ đơn mới cũng tự tích tem.",
 };
 
 const EN = {
@@ -46,9 +47,10 @@ const EN = {
   mock_hint: "(test mode — check the server log for the code)",
   ok_title: "Verified!",
   linked_bowls: "bowls linked to your account",
+  linked_stamps: "stamps restored from your past orders",
   linked_none: "No past data to link.",
   stamps_note:
-    "Old stamps can't be restored from stored data — from now on your orders earn stamps automatically.",
+    "Your past counter orders have been credited — from now on new orders earn stamps automatically.",
 };
 
 import { useState } from "react";
@@ -89,7 +91,9 @@ export default function PhoneVerify({
   const [maskedPhone, setMaskedPhone] = useState(
     initialVerified && initialPhone ? maskPhone(initialPhone) : ""
   );
-  const [linked, setLinked] = useState<{ bowls: number } | null>(null);
+  const [linked, setLinked] = useState<{ bowls: number; stamps: number } | null>(
+    null
+  );
 
   const send = async () => {
     if (busy) return;
@@ -120,7 +124,7 @@ export default function PhoneVerify({
         return;
       }
       setMaskedPhone(res.maskedPhone);
-      setLinked({ bowls: res.byoBowlsLinked });
+      setLinked({ bowls: res.byoBowlsLinked, stamps: res.stampsBackfilled });
       setStep("verified");
     } finally {
       setBusy(false);
@@ -233,8 +237,13 @@ export default function PhoneVerify({
           </p>
           {linked ? (
             <p className="text-xs text-kale-600">
-              {linked.bowls > 0
-                ? `${linked.bowls} ${s.linked_bowls}.`
+              {linked.bowls > 0 || linked.stamps > 0
+                ? [
+                    linked.stamps > 0 && `${linked.stamps} ${s.linked_stamps}`,
+                    linked.bowls > 0 && `${linked.bowls} ${s.linked_bowls}`,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ") + "."
                 : s.linked_none}
             </p>
           ) : (

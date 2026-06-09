@@ -35,7 +35,10 @@ export type VerifyPhoneResult =
       ok: true;
       maskedPhone: string;
       byoBowlsLinked: number;
-      stampsLinked: number;
+      /** iPOS orders linked to the account (TSK-155 Option B persistence). */
+      iposOrdersLinked: number;
+      /** Stamps minted by replaying those persisted orders (TSK-155). */
+      stampsBackfilled: number;
     }
   | { ok: false; error: string };
 
@@ -152,6 +155,7 @@ export async function verifyPhoneOtpAction(
     ok: true,
     maskedPhone: maskPhone(phone),
     byoBowlsLinked: summary.byoBowlsLinked,
-    stampsLinked: summary.stampsLinked,
+    iposOrdersLinked: summary.iposOrdersLinked,
+    stampsBackfilled: summary.stampsBackfilled,
   };
 }

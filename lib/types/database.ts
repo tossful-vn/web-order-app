@@ -26,10 +26,12 @@ export type Profile = {
   phone: string | null;
   /**
    * Whether `phone` was proven via Zalo OTP (TSK-149 retro-verify). Defaults
-   * false on every existing row at migration time — it is NOT a backfill of the
-   * older phone-OTP signup path, and is NOT used to gate TSK-148 stamp
-   * eligibility (which still keys on `phone` presence). It marks the explicit
-   * retro-verification only. `phone_verified_at` is the moment it flipped true.
+   * false on every existing row at migration time. Since TSK-155 this is the
+   * SOLE gate for iPOS stamp + BYO attribution (Hieu's rule): a phone merely
+   * present on a profile no longer earns — only `phone_verified = true` does.
+   * Pre-TSK-155 accounts that signed up via phone-OTP must retro-verify to start
+   * earning; their past orders are persisted in `ipos_orders` and back-fill on
+   * verify. `phone_verified_at` is the moment it flipped true.
    */
   phone_verified: boolean;
   phone_verified_at: string | null;
@@ -71,6 +73,24 @@ export type PhoneOtpPending = {
   purpose: OtpPurpose;
   expires_at: string;
   attempts: number;
+  created_at: string;
+};
+
+/**
+ * Row of public.ipos_orders (TSK-155, Option B). Every attributable iPOS EOD
+ * order is persisted here (one row per `ipos_tran_id`), whether or not a verified
+ * web account exists yet. Unverified/unmatched orders carry `profile_id` NULL and
+ * are linked + replayed into stamps when the customer later verifies their phone.
+ * Customer-facing reads are owner-scoped via RLS (profile_id = auth.uid()).
+ */
+export type IposOrder = {
+  id: string;
+  ipos_tran_id: string;
+  store_id: string | null;
+  phone: string | null;
+  profile_id: string | null;
+  ordered_at: string;
+  source: string;
   created_at: string;
 };
 
