@@ -9,6 +9,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
+import { STAMPS_REQUIRED } from "@/lib/types/loyalty";
 import { normalizeIposPhone } from "@/lib/ipos/normalizePhone";
 import { parseEodOrders, IPOS_STORE_UIDS, type ParsedOrder } from "@/lib/ipos/parseEodOrders";
 import {
@@ -138,7 +139,10 @@ function memStore(accounts: Record<string, VerifiedAccount> = {}) {
     },
     async findCollectingCard(userId) {
       const matches = cards.filter(
-        (c) => c.user_id === userId && c.reward_status === "collecting" && c.stamps_collected < 8,
+        (c) =>
+          c.user_id === userId &&
+          c.reward_status === "collecting" &&
+          c.stamps_collected < STAMPS_REQUIRED,
       );
       const c = matches[matches.length - 1];
       return c ? { id: c.id, stamps_collected: c.stamps_collected, reward_status: c.reward_status } : null;
@@ -212,15 +216,16 @@ test("applyStamps — idempotent: same file twice = same stamp count", async () 
   assert.equal(entries.length, countAfterFirst, "re-import must not add entries");
 });
 
-test("applyStamps — heavy customer rolls over at 8 (no redemption)", async () => {
+test("applyStamps — heavy customer rolls over at STAMPS_REQUIRED (no redemption)", async () => {
   const { store, cards, entries } = memStore({ [REG]: acct(0) });
-  const orders = Array.from({ length: 10 }, (_, i) => ord(`o${i}`, REG, i + 1));
+  const n = STAMPS_REQUIRED + 2; // fill one card + start the next
+  const orders = Array.from({ length: n }, (_, i) => ord(`o${i}`, REG, i + 1));
   const s = await applyStamps(store, orders);
 
-  assert.equal(s.inserted, 10);
-  assert.equal(entries.length, 10);
-  assert.equal(cards.length, 2, "10 stamps → two cards (8 + 2)");
-  assert.equal(cards[0].stamps_collected, 8);
+  assert.equal(s.inserted, n);
+  assert.equal(entries.length, n);
+  assert.equal(cards.length, 2, `${n} stamps → two cards (${STAMPS_REQUIRED} + 2)`);
+  assert.equal(cards[0].stamps_collected, STAMPS_REQUIRED);
   assert.equal(cards[0].reward_status, "reward_ready"); // ready, never redeemed
   assert.equal(cards[1].stamps_collected, 2);
   assert.equal(cards[1].reward_status, "collecting");

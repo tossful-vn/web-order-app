@@ -69,7 +69,7 @@ export function extractOrderArray(raw: unknown): RawOrder[] {
 }
 
 /** `extra_data` may arrive as a nested object or a JSON-encoded string. */
-function readExtraData(order: RawOrder): Record<string, unknown> {
+export function readExtraData(order: RawOrder): Record<string, unknown> {
   const ed = order.extra_data;
   if (ed && typeof ed === "object") return ed as Record<string, unknown>;
   if (typeof ed === "string" && ed.trim()) {
@@ -83,13 +83,13 @@ function readExtraData(order: RawOrder): Record<string, unknown> {
   return {};
 }
 
-function asString(v: unknown): string | null {
+export function asString(v: unknown): string | null {
   if (typeof v === "string") return v;
   if (typeof v === "number" && Number.isFinite(v)) return String(v);
   return null;
 }
 
-function asEpochMs(v: unknown): number | null {
+export function asEpochMs(v: unknown): number | null {
   if (typeof v === "number" && Number.isFinite(v)) return v;
   if (typeof v === "string" && v.trim() && Number.isFinite(Number(v))) return Number(v);
   return null;

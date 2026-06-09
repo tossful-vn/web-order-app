@@ -1,0 +1,51 @@
+/* ── Branded ingredient loader (TSK-153, Part C) ──
+   GPU transform only (translateY) so it never triggers layout / CLS. */
+.ing-loader {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.ing-loader-dot {
+  display: inline-flex;
+  will-change: transform;
+  animation: ing-bounce 0.9s ease-in-out infinite;
+  /* iMessage-dots wave: each icon trails the last by 0.15s. */
+  animation-delay: calc(var(--i) * 0.15s);
+}
+
+@keyframes ing-bounce {
+  0%, 60%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-9px); }
+}
+
+/* Full-screen wash for route change + plan mutations. kale-50 @ ~80%. */
+.ing-loader-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(243, 247, 241, 0.8);
+  animation: ing-fade-in 0.2s ease-out;
+}
+
+@keyframes ing-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Reduced motion: no bounce / no fade — a gentle opacity pulse instead. */
+@media (prefers-reduced-motion: reduce) {
+  .ing-loader-dot {
+    animation: ing-pulse 1.3s ease-in-out infinite;
+  }
+  .ing-loader-overlay {
+    animation: none;
+  }
+  @keyframes ing-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.45; }
+  }
+}

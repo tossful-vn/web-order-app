@@ -41,3 +41,34 @@ export async function getActiveStampCard(): Promise<{
     entries: (entries ?? []) as StampEntry[],
   };
 }
+
+/**
+ * The full data the v2 stamp card needs to render server-side (TSK-153, Part B).
+ * Counts are always read from the DB — never hardcoded. `hasVerifiedPhone`
+ * tells the card whether stamps can ever attach to this account: a profile gets
+ * its `phone` set ONLY via the OTP-verified signup/reset flow, so a null phone
+ * means "no number on file" → the card shows the "add your phone" state instead
+ * of an empty progress ring.
+ */
+export async function getStampCardView(): Promise<{
+  card: StampCard | null;
+  entries: StampEntry[];
+  hasVerifiedPhone: boolean;
+}> {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { card: null, entries: [], hasVerifiedPhone: false };
+
+  const [{ data: profile }, active] = await Promise.all([
+    supabase.from("profiles").select("phone").eq("id", user.id).maybeSingle(),
+    getActiveStampCard(),
+  ]);
+
+  return {
+    card: active?.card ?? null,
+    entries: active?.entries ?? [],
+    hasVerifiedPhone: !!profile?.phone,
+  };
+}

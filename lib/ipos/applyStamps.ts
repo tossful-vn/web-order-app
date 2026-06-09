@@ -22,10 +22,10 @@
  * adapter used by the import script.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { INGREDIENT_POOL } from "@/lib/types/loyalty";
+import { INGREDIENT_POOL, STAMPS_REQUIRED } from "@/lib/types/loyalty";
 import type { ParsedOrder } from "@/lib/ipos/parseEodOrders";
 
-const MAX_STAMPS = 8;
+const MAX_STAMPS = STAMPS_REQUIRED;
 const IPOS_SOURCE = "ipos_eod";
 const REWARD_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -89,11 +89,14 @@ export type ApplyStampsSummary = {
   errors: number;
 };
 
-/** Deterministic ingredient for a slot — mirrors the existing add_test_stamp. */
+/**
+ * Deterministic ingredient for a slot — mirrors the loyalty API's add_test_stamp.
+ * Every one of the {@link STAMPS_REQUIRED} slots shows a real ingredient (the
+ * mascot now lives in the centre of the v2 card, not in a slot), so we just
+ * cycle the pool.
+ */
 function ingredientForStamp(stampNumber: number): string {
-  return stampNumber >= MAX_STAMPS
-    ? "mascot"
-    : INGREDIENT_POOL[(stampNumber - 1) % INGREDIENT_POOL.length];
+  return INGREDIENT_POOL[(stampNumber - 1) % INGREDIENT_POOL.length];
 }
 
 /** Stable order: chronological by `tran_date`, then `tran_id` (nulls last). */

@@ -7,204 +7,121 @@
   font-display: swap;
 }
 
-/* ── Stamp card arc layout ── */
-.stamp-arc-wrap {
+/* ───────────────────────── Magic Stamp card v2 (TSK-153) ─────────────────────────
+   Hand-made Tossful look: canvas #F4F1E6, green #0F563D, pink #F8E3F3, accents
+   #7D291A / #F68C02. Nine stamps in an even full circle (40° apart) with the
+   mascot at the centre; the 10th (free) item is the distinct centre when full.
+   Display-only — no redeem button (redemption happens in store).
+*/
+.stamp-card {
+  background: #F4F1E6;
+  border: 1px solid #e7e1cd;
+  border-radius: 22px;
+  padding: 22px 18px 24px;
+}
+
+/* Message-only states (no verified phone) */
+.stamp-card-message {
+  text-align: center;
+  padding: 32px 22px;
+}
+.stamp-message-mascot {
+  display: inline-flex;
+  margin-bottom: 12px;
+  opacity: 0.55;
+}
+
+/* ── The ring ── */
+.stamp-ring {
   position: relative;
   width: 100%;
-  max-width: 400px;
-  aspect-ratio: 400 / 300;
-  /* container-type: inline-size enables cqi (container query inline)
-     units below so stamp slots scale with the wrap. Prevents overlap
-     on narrow mobile (320–380px) — at 400px container, 13cqi = 52px;
-     at 320px, 13cqi ≈ 41.6px. Arc geometry stays balanced. */
+  max-width: 300px;
+  aspect-ratio: 1 / 1;
   container-type: inline-size;
 }
 
-/* ── Tossful semicircle wordmark above the bowl ── */
-.stamp-wordmark {
+/* Centre node — mascot while collecting, the free 10th item when full. */
+.stamp-centre {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: clamp(64px, 25cqi, 76px);
+  height: clamp(64px, 25cqi, 76px);
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid #0F563D;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  box-shadow: 0 2px 8px rgba(15, 86, 61, 0.08);
 }
-.stamp-wordmark text {
-  font-family: 'Refusit', var(--font-fraunces), 'Fraunces', Georgia, serif;
-  font-weight: 500;
-  fill: #1F5E3A;
-  text-anchor: middle;
-  dominant-baseline: middle;
+.stamp-centre.reward {
+  background: #F8E3F3;
+  border-color: #0F563D;
+  animation: stamp-reward-pulse 1.8s ease-in-out infinite;
+}
+.stamp-centre-free {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #0F563D;
 }
 
 /* ── Individual stamp slot ── */
 .stamp-slot {
   position: absolute;
-  /* Slot scales with container width via cqi — 13cqi = 13% of container
-     inline size. Clamped 40–52px so it stays tap-target-friendly even on
-     very small screens and doesn't bloat on desktop. */
-  width: clamp(40px, 13cqi, 52px);
-  height: clamp(40px, 13cqi, 52px);
-  margin-left: clamp(-26px, -6.5cqi, -20px);
-  margin-top: clamp(-26px, -6.5cqi, -20px);
+  transform: translate(-50%, -50%);
+  width: clamp(40px, 15.5cqi, 50px);
+  height: clamp(40px, 15.5cqi, 50px);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: border-color 0.3s ease, background-color 0.3s ease, box-shadow 0.3s ease, transform 0.15s ease;
+  transition: transform 0.15s ease, box-shadow 0.2s ease;
 }
-
-/* Icons inside slots scale with the slot. */
-.stamp-slot > svg {
-  width: 62%;
-  height: 62%;
-}
-
 .stamp-slot.empty {
   border: 1.5px dashed #c9dac2;
   background: transparent;
-  cursor: pointer;
 }
-
-.stamp-slot.empty:hover {
-  border-color: #5c8650;
-  background: rgba(243, 247, 241, 0.6);
-  transform: scale(1.1);
-}
-
-.stamp-slot.empty:active {
-  transform: scale(0.95);
-}
-
 .stamp-slot.filled {
-  border: 1.5px solid #c9dac2;
-  background: #ffffff;
+  border: 1.5px solid #0F563D;
+  background: #F8E3F3;
+  box-shadow: 0 1px 5px rgba(15, 86, 61, 0.1);
+}
+/* Filled icons tilt slightly for the hand-made character (var set per slot). */
+.stamp-slot.filled > svg {
+  transform: rotate(var(--rot, 0deg));
+}
+.stamp-slot[role="button"]:hover {
+  transform: translate(-50%, -50%) scale(1.08);
+}
+.stamp-slot[role="button"]:active {
+  transform: translate(-50%, -50%) scale(0.96);
 }
 
-.stamp-slot.latest {
-  border: 2px solid #1F5E3A;
-  background: #f3f7f1;
-  box-shadow: 0 0 0 3px rgba(31, 94, 58, 0.1);
+/* ── Reward banner (full card, in-store redemption) ── */
+.stamp-reward-banner {
+  display: inline-block;
+  background: #F8E3F3;
+  border: 1px solid #f0cfe6;
+  border-radius: 14px;
+  padding: 10px 18px;
 }
 
-/* ── Latest-stamp dot badge ── */
-.latest-dot {
-  position: absolute;
-  top: -2px;
-  right: -2px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #1F5E3A;
-  border: 1.5px solid #faf7f0;
+@keyframes stamp-reward-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(15, 86, 61, 0.18); }
+  50% { box-shadow: 0 0 0 7px rgba(15, 86, 61, 0); }
 }
 
-/* ── Reward CTA button ── */
-.reward-cta {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  max-width: 260px;
-  padding: 14px 24px;
-  background: #1F5E3A;
-  color: #faf7f0;
-  border: none;
-  border-radius: 12px;
-  font-size: 15px;
-  font-weight: 500;
-  cursor: pointer;
-  position: relative;
-  transition: background 0.2s ease;
-}
-
-.reward-cta:hover {
-  background: #174a2e;
-}
-
-/* Pulse ring animation */
-.reward-cta::before {
-  content: "";
-  position: absolute;
-  inset: -4px;
-  border-radius: 16px;
-  border: 2px solid #1F5E3A;
-  animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
-@keyframes pulse-ring {
-  0% {
-    opacity: 0.6;
-    transform: scale(1);
+/* Reduced motion: no pulse, keep a steady ring instead. */
+@media (prefers-reduced-motion: reduce) {
+  .stamp-centre.reward {
+    animation: none;
+    box-shadow: 0 0 0 4px rgba(15, 86, 61, 0.14);
   }
-  50% {
-    opacity: 0;
-    transform: scale(1.08);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(1.08);
-  }
-}
-
-/* ── Reward picker overlay ── */
-.reward-picker-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(31, 42, 29, 0.5);
-  backdrop-filter: blur(4px);
-  animation: fadeIn 0.2s ease;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-/* ── Radio option cards ── */
-.rp-option {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  border: 1.5px solid #c9dac2;
-  border-radius: 12px;
-  cursor: pointer;
-  transition: border-color 0.2s ease, background-color 0.2s ease;
-}
-
-.rp-option:hover {
-  border-color: #a4c098;
-  background: #f3f7f1;
-}
-
-.rp-option.selected {
-  border-color: #1F5E3A;
-  background: #f3f7f1;
-  box-shadow: 0 0 0 1px #1F5E3A;
-}
-
-/* Radio dot indicator */
-.rp-option::before {
-  content: "";
-  flex-shrink: 0;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  border: 2px solid #c9dac2;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.rp-option.selected::before {
-  border-color: #1F5E3A;
-  box-shadow: inset 0 0 0 4px #1F5E3A;
 }
 
 /* ── Ingredient infographic modal ── */
