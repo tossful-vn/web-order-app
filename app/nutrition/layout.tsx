@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getPreferredStore } from "@/lib/profile/preferred-store";
 import AppShell from "@/lib/components/AppShell.client";
 
 /**
@@ -16,6 +17,11 @@ export default async function NutritionLayout({
     data: { user },
   } = await supabase.auth.getUser();
   const userObj = user ? { email: user.email } : null;
+  const preferredStore = user ? await getPreferredStore(user.id) : null;
 
-  return <AppShell user={userObj}>{children}</AppShell>;
+  return (
+    <AppShell user={userObj} preferredStore={preferredStore}>
+      {children}
+    </AppShell>
+  );
 }

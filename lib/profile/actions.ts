@@ -51,6 +51,7 @@ export async function setPreferredStore(city: StoreCity): Promise<void> {
     .eq("id", user.id);
   if (error) throw new Error(error.message);
   revalidatePath("/nutrition");
+  revalidatePath("/byw");
   revalidatePath("/account/profile");
 }
 
@@ -71,6 +72,7 @@ export async function clearPreferredStore(): Promise<void> {
     .eq("id", user.id);
   if (error) throw new Error(error.message);
   revalidatePath("/nutrition");
+  revalidatePath("/byw");
   revalidatePath("/account/profile");
 }
 

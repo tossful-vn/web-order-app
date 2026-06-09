@@ -49,9 +49,14 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { useLang, persistLang, type Lang } from "@/lib/lang";
 import { signOut } from "@/lib/auth/actions";
+import CityChip from "@/lib/components/CityChip.client";
+import type { StoreCity } from "@/lib/types/database";
 
 type Props = {
   user: { email: string | null | undefined } | null;
+  // Current preferred store (TSK-145) — resolved SSR by each layout. Drives the
+  // header city chip; only shown when there's a logged-in user.
+  preferredStore?: StoreCity | null;
   children: React.ReactNode;
 };
 
@@ -66,7 +71,7 @@ export default function AppShell(props: Props) {
   );
 }
 
-function AppShellInner({ user, children }: Props) {
+function AppShellInner({ user, preferredStore = null, children }: Props) {
   const pathname = usePathname() ?? "";
   const searchParams = useSearchParams();
   // Brand-site mode: tossful.com/calculator proxies /nutrition with ?src=brand-site.
@@ -161,17 +166,25 @@ function AppShellInner({ user, children }: Props) {
               </Link>
             ))}
           </nav>
-          <button
-            type="button"
-            onClick={() => setOpen(true)}
+          {/* Right-side group: city chip (logged-in only) + menu burger. Kept
+              together so the chip sits just before the burger in both the
+              default flex row and the brand-site centered grid. TSK-145. */}
+          <div
             className={
-              "w-9 h-9 rounded-full bg-kale-50 text-kale-700 flex items-center justify-center shrink-0 " +
+              "flex items-center gap-1.5 shrink-0 " +
               (isBrandSite ? "col-start-3 row-start-1 justify-self-end" : "")
             }
-            aria-label={str.menu_label}
           >
-            <i className="ti ti-menu-2 text-xl" />
-          </button>
+            {user && <CityChip initial={preferredStore} lang={lang} />}
+            <button
+              type="button"
+              onClick={() => setOpen(true)}
+              className="w-9 h-9 rounded-full bg-kale-50 text-kale-700 flex items-center justify-center shrink-0"
+              aria-label={str.menu_label}
+            >
+              <i className="ti ti-menu-2 text-xl" />
+            </button>
+          </div>
         </div>
       </header>
 
