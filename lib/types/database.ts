@@ -24,6 +24,15 @@ export type Profile = {
    * Nullable so pre-TSK-127 accounts don't break; new signups always set it.
    */
   phone: string | null;
+  /**
+   * Whether `phone` was proven via Zalo OTP (TSK-149 retro-verify). Defaults
+   * false on every existing row at migration time — it is NOT a backfill of the
+   * older phone-OTP signup path, and is NOT used to gate TSK-148 stamp
+   * eligibility (which still keys on `phone` presence). It marks the explicit
+   * retro-verification only. `phone_verified_at` is the moment it flipped true.
+   */
+  phone_verified: boolean;
+  phone_verified_at: string | null;
   contact_phone: string | null;
   /**
    * NULL until the customer picks a store (TSK-130). New signups start unset so
@@ -48,8 +57,11 @@ export type Profile = {
   updated_at: string;
 };
 
-/** phone_otp_pending.purpose — OTP verifies phone ownership (TSK-127). */
-export type OtpPurpose = "signup" | "reset";
+/**
+ * phone_otp_pending.purpose — OTP verifies phone ownership. signup/reset
+ * (TSK-127) + verify (TSK-149 retroactive phone verification in /account).
+ */
+export type OtpPurpose = "signup" | "reset" | "verify";
 
 /** Row of public.phone_otp_pending. Service-role only (RLS on, no policies). */
 export type PhoneOtpPending = {

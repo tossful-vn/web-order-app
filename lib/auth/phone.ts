@@ -47,3 +47,16 @@ export function isValidPhone(raw: string): boolean {
 export function syntheticEmail(phone: string): string {
   return `${normalizePhone(phone)}@phone.tossful.local`;
 }
+
+/**
+ * Mask a verified phone for display (TSK-149) — keep the first 3 and last 3
+ * digits, dot out the middle: 0936336649 -> "093••••649". Short/odd inputs are
+ * returned normalised but unmasked rather than throwing.
+ */
+export function maskPhone(raw: string): string {
+  const p = normalizePhone(raw);
+  if (p.length < 7) return p;
+  const head = p.slice(0, 3);
+  const tail = p.slice(-3);
+  return `${head}${"•".repeat(p.length - 6)}${tail}`;
+}
