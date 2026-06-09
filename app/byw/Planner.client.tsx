@@ -17,6 +17,7 @@ import {
 import { useLang } from "@/lib/lang";
 import { BYW_STR } from "./i18n";
 import MacroPanel from "@/lib/components/MacroPanel";
+import IngredientLoader from "@/lib/components/IngredientLoader.client";
 import { addWeekItem, deleteWeekItem, moveWeekItem, removeWeekItem } from "@/lib/weeks/actions";
 import { Draggable, Droppable, type DragData } from "./dnd";
 import BywDrawer from "./BywDrawer.client";
@@ -122,6 +123,18 @@ export default function Planner({ weekId: _weekId, items, savedBowls, addons, si
   const [armedDay, setArmedDay] = useState<number | null>(null);
   // Active drag payload (drives DragOverlay + drop-zone hints).
   const [activeDrag, setActiveDrag] = useState<DragData | null>(null);
+
+  // Branded loader for plan mutations (add / move / delete). Only show it once a
+  // transition has run past 300ms, so fast server actions don't flash a loader.
+  const [showBusyLoader, setShowBusyLoader] = useState(false);
+  useEffect(() => {
+    if (!busy) {
+      setShowBusyLoader(false);
+      return;
+    }
+    const t = setTimeout(() => setShowBusyLoader(true), 300);
+    return () => clearTimeout(t);
+  }, [busy]);
 
   // Any time the server refreshes the item list, drop all optimistic layers.
   useEffect(() => {
@@ -347,6 +360,7 @@ export default function Planner({ weekId: _weekId, items, savedBowls, addons, si
       onDragCancel={handleDragCancel}
     >
       <div className="byw-page">
+        {showBusyLoader && <IngredientLoader overlay lang={lang} />}
         <div className="byw-app">
           <h1 className="byw-hero-h1">{str.page_title}</h1>
           <p className="byw-hero-p">{str.page_sub}</p>

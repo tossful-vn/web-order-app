@@ -39,3 +39,12 @@ export const INGREDIENT_POOL = [
 ] as const;
 
 export type IngredientKey = typeof INGREDIENT_POOL[number] | "mascot";
+
+/**
+ * Loyalty economics — single source of truth (TSK-153).
+ * Collect {@link STAMPS_REQUIRED} stamps; the next item (the
+ * {@link REWARD_ITEM_NUMBER}-th) is free. Bumped 8 → 9 in Sprint 3; every "8"
+ * across the UI, the iPOS apply rollover, and the loyalty API now reads these.
+ */
+export const STAMPS_REQUIRED = 9;
+export const REWARD_ITEM_NUMBER = STAMPS_REQUIRED + 1; // 10th item free

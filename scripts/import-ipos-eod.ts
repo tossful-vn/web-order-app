@@ -18,6 +18,8 @@ import { readFileSync } from "node:fs";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { IPOS_STORE_UIDS, parseEodOrders } from "@/lib/ipos/parseEodOrders";
 import { applyStamps, createSupabaseStampStore } from "@/lib/ipos/applyStamps";
+import { parseByoBowls } from "@/lib/ipos/parseByoBowls";
+import { applyByoBowls, createSupabaseByoStore } from "@/lib/ipos/applyByoBowls";
 
 /** CLI store key → iPOS store_uid + the `stores.code` used to resolve stores.id. */
 const STORE_CONFIG = {
@@ -82,6 +84,9 @@ async function main() {
   const { orders, stats } = parseEodOrders(raw, storeId, storeUid);
   const distinctPhones = new Set(orders.map((o) => o.phone)).size;
 
+  // BYO archive (TSK-153) — independent of the stamp pipeline, same file.
+  const byo = parseByoBowls(raw, storeId, storeUid);
+
   console.log(`\n── iPOS EOD parse (${storeKey}) ──`);
   console.log(`  read .............. ${stats.read}`);
   console.log(`  attributable ...... ${stats.attributable}`);
@@ -91,10 +96,26 @@ async function main() {
   console.log(`  dropped (no id) ... ${stats.droppedNoTranId}`);
   console.log(`  duplicate tran_ids  ${stats.duplicateTranIds}`);
 
+  console.log(`\n── BYO archive parse (${storeKey}) ──`);
+  console.log(`  byo lines ......... ${byo.stats.byoLinesFound}`);
+  console.log(`  bowls parsed ...... ${byo.stats.bowlsParsed}`);
+  console.log(`  attributable ...... ${byo.stats.attributable}`);
+  console.log(`  phoneless ......... ${byo.stats.phoneless}`);
+  console.log(`  distinct phones ... ${byo.stats.distinctPhones}`);
+  console.log(`  real ingredients .. ${byo.stats.realIngredients}`);
+  console.log(`  modifier lines .... ${byo.stats.modifierIngredients}`);
+  console.log(`  undated (skipped) . ${byo.stats.undated}`);
+  console.log(`  dropped (no lineid) ${byo.stats.droppedNoLineId}`);
+  console.log(
+    `  modifier classes .. ${byo.stats.modifierItemIds.join(", ") || "(none seen)"}`,
+  );
+
   if (dryRun) {
     console.log(
       `\n[dry-run] no DB writes. ${distinctPhones} phones with a real number;` +
-        ` only those with a registered + verified web account (post-signup) earn stamps.`,
+        ` only those with a registered + verified web account (post-signup) earn stamps.` +
+        ` ${byo.stats.bowlsParsed} BYO bowls would be archived` +
+        ` (${byo.stats.attributable} attributable across ${byo.stats.distinctPhones} customers).`,
     );
     return;
   }
@@ -112,8 +133,25 @@ async function main() {
   console.log(`  skipped (pre-signup)${summary.skippedPreSignup}`);
   console.log(`  new cards ......... ${summary.newCards}`);
   if (summary.errors) console.log(`  errors ............ ${summary.errors}`);
+
+  // 4. Archive BYO bowls (idempotent on ipos_line_id). Keeps unattributed bowls.
+  const byoStore = createSupabaseByoStore(supabase!);
+  const byoSummary = await applyByoBowls(byoStore, byo.bowls);
+
+  console.log(`\n── BYO archive apply ──`);
+  console.log(`  bowls ............. ${byoSummary.bowls}`);
+  console.log(`  inserted .......... ${byoSummary.inserted}`);
+  console.log(`  ingredients ....... ${byoSummary.ingredients}`);
+  console.log(`  linked to profile . ${byoSummary.linkedToProfile}`);
+  console.log(`  phone only ........ ${byoSummary.phoneOnly}`);
+  console.log(`  anonymous ......... ${byoSummary.anonymous}`);
+  console.log(`  skipped (existing)  ${byoSummary.skippedExisting}`);
+  console.log(`  skipped (undated) . ${byoSummary.skippedUndated}`);
+  if (byoSummary.errors) console.log(`  errors ............ ${byoSummary.errors}`);
+
   console.log(
-    `\n✓ done. Re-running this command imports 0 new stamps (idempotent on tran_id).`,
+    `\n✓ done. Re-running this command imports 0 new stamps and 0 new bowls` +
+      ` (idempotent on tran_id / ipos_line_id).`,
   );
 }
 

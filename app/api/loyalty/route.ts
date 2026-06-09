@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { INGREDIENT_POOL, STAMPS_REQUIRED } from "@/lib/types/loyalty";
 
 export async function POST(request: Request) {
   const supabase = createClient();
@@ -74,13 +75,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No active collecting card" }, { status: 404 });
     }
 
-    if (card.stamps_collected >= 8) {
+    if (card.stamps_collected >= STAMPS_REQUIRED) {
       return NextResponse.json({ error: "Card already full" }, { status: 400 });
     }
 
     const nextStampNum = card.stamps_collected + 1;
-    const ingredientPool = ["carrot", "avocado", "beetroot", "chili", "edamame", "nut", "herb"];
-    const ingredient = nextStampNum === 8 ? "mascot" : ingredientPool[(nextStampNum - 1) % 7];
+    const ingredient = INGREDIENT_POOL[(nextStampNum - 1) % INGREDIENT_POOL.length];
 
     // Insert the stamp entry
     const { error: entryErr } = await supabase.from("stamp_entries").insert({
@@ -94,7 +94,7 @@ export async function POST(request: Request) {
     }
 
     // Update the card
-    const isComplete = nextStampNum === 8;
+    const isComplete = nextStampNum >= STAMPS_REQUIRED;
     const updateFields: Record<string, unknown> = { stamps_collected: nextStampNum };
     if (isComplete) {
       updateFields.reward_status = "reward_ready";
