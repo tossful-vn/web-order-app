@@ -35,7 +35,8 @@ export type VerifyPhoneResult =
       ok: true;
       maskedPhone: string;
       byoBowlsLinked: number;
-      stampsLinked: number;
+      /** iPOS orders linked to the account (TSK-155 Option B persistence). */
+      iposOrdersLinked: number;
     }
   | { ok: false; error: string };
 
@@ -99,8 +100,9 @@ export async function requestVerifyOtpAction(
 
 /**
  * Step 2 — verify the submitted code, mark the phone verified on the profile,
- * and back-fill historical iPOS rows recorded against that normalised phone.
- * Reports per-target link counts so the UI can show what was reclaimed.
+ * and link historical iPOS rows (BYO bowls + orders) recorded against that
+ * normalised phone. Mints NO stamps — earning starts at verification (TSK-155).
+ * Reports per-target link counts so the UI can show what history was linked.
  */
 export async function verifyPhoneOtpAction(
   phoneRaw: string,
@@ -137,8 +139,8 @@ export async function verifyPhoneOtpAction(
     .eq("id", userId);
   if (upErr) return { ok: false, error: MSG_GENERIC };
 
-  // Centrepiece: link every historical row attributable to this phone.
-  // Idempotent — re-verifying links nothing new.
+  // Link every historical row attributable to this phone (BYO + iPOS orders).
+  // Mints NO stamps — earning starts at verification (TSK-155). Idempotent.
   const summary = await backfillForVerifiedPhone(
     createSupabaseBackfillStore(admin),
     phone,
@@ -152,6 +154,6 @@ export async function verifyPhoneOtpAction(
     ok: true,
     maskedPhone: maskPhone(phone),
     byoBowlsLinked: summary.byoBowlsLinked,
-    stampsLinked: summary.stampsLinked,
+    iposOrdersLinked: summary.iposOrdersLinked,
   };
 }

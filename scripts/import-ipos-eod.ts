@@ -18,6 +18,10 @@ import { readFileSync } from "node:fs";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { IPOS_STORE_UIDS, parseEodOrders } from "@/lib/ipos/parseEodOrders";
 import { applyStamps, createSupabaseStampStore } from "@/lib/ipos/applyStamps";
+import {
+  applyIposOrders,
+  createSupabaseIposOrderStore,
+} from "@/lib/ipos/applyIposOrders";
 import { parseByoBowls } from "@/lib/ipos/parseByoBowls";
 import { applyByoBowls, createSupabaseByoStore } from "@/lib/ipos/applyByoBowls";
 
@@ -113,14 +117,31 @@ async function main() {
   if (dryRun) {
     console.log(
       `\n[dry-run] no DB writes. ${distinctPhones} phones with a real number;` +
-        ` only those with a registered + verified web account (post-signup) earn stamps.` +
+        ` ALL ${stats.attributable} attributable orders would be persisted to ipos_orders,` +
+        ` but a stamp is earned only for an order placed on/after the customer's` +
+        ` phone_verified_at (no retroactive stamps).` +
         ` ${byo.stats.bowlsParsed} BYO bowls would be archived` +
         ` (${byo.stats.attributable} attributable across ${byo.stats.distinctPhones} customers).`,
     );
     return;
   }
 
-  // 3. Apply stamps (idempotent). Only registered + verified, post-signup orders.
+  // 3. Persist EVERY attributable order (idempotent on ipos_tran_id). Option B:
+  //    orders are kept for history/BYO linking even when not (yet) stamp-eligible.
+  const orderStore = createSupabaseIposOrderStore(supabase!);
+  const orderSummary = await applyIposOrders(orderStore, orders);
+
+  console.log(`\n── iPOS order persist ──`);
+  console.log(`  orders ............ ${orderSummary.orders}`);
+  console.log(`  inserted .......... ${orderSummary.inserted}`);
+  console.log(`  linked to profile . ${orderSummary.linkedToProfile}`);
+  console.log(`  unlinked .......... ${orderSummary.unlinked}`);
+  console.log(`  skipped (existing)  ${orderSummary.skippedExisting}`);
+  console.log(`  skipped (undated) . ${orderSummary.skippedUndated}`);
+  if (orderSummary.errors) console.log(`  errors ............ ${orderSummary.errors}`);
+
+  // 4. Apply stamps (idempotent). Earning starts at phone_verified_at (TSK-155):
+  //    only orders on/after the customer's verification moment earn.
   const store = createSupabaseStampStore(supabase!);
   const summary = await applyStamps(store, orders);
 
@@ -130,11 +151,12 @@ async function main() {
   console.log(`  inserted .......... ${summary.inserted}`);
   console.log(`  skipped (existing)  ${summary.skippedExisting}`);
   console.log(`  skipped (no acct) . ${summary.skippedNoAccount}`);
-  console.log(`  skipped (pre-signup)${summary.skippedPreSignup}`);
+  console.log(`  skipped (pre-verif) ${summary.skippedPreVerification}`);
+  console.log(`  skipped (undated) . ${summary.skippedUndated}`);
   console.log(`  new cards ......... ${summary.newCards}`);
   if (summary.errors) console.log(`  errors ............ ${summary.errors}`);
 
-  // 4. Archive BYO bowls (idempotent on ipos_line_id). Keeps unattributed bowls.
+  // 5. Archive BYO bowls (idempotent on ipos_line_id). Keeps unattributed bowls.
   const byoStore = createSupabaseByoStore(supabase!);
   const byoSummary = await applyByoBowls(byoStore, byo.bowls);
 
@@ -150,8 +172,8 @@ async function main() {
   if (byoSummary.errors) console.log(`  errors ............ ${byoSummary.errors}`);
 
   console.log(
-    `\n✓ done. Re-running this command imports 0 new stamps and 0 new bowls` +
-      ` (idempotent on tran_id / ipos_line_id).`,
+    `\n✓ done. Re-running this command persists 0 new orders, 0 new stamps and` +
+      ` 0 new bowls (idempotent on ipos_tran_id / tran_id / ipos_line_id).`,
   );
 }
 

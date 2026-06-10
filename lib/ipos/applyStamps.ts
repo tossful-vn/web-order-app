@@ -1,15 +1,15 @@
 /**
- * Apply Magic Stamps from parsed iPOS EOD orders (TSK-148).
+ * Apply Magic Stamps from parsed iPOS EOD orders (TSK-148, gate updated TSK-155).
  *
- * Magic Stamps are for WEB-ACCOUNT holders only: stamps start once a customer
- * signs up with a verified mobile. So an iPOS order earns a stamp only when
- *   1. its phone matches a `profiles` row (in this app `profiles.phone` is set
- *      ONLY by the OTP-verified signup/reset flow, so a non-null phone == a
- *      verified mobile), and
- *   2. the order was placed on/after that account's signup (`profiles.created_at`)
- *      — pre-signup orders do not count retroactively.
- * Orders from unregistered / unverified phones, or placed before signup, are
- * skipped (no phone-only cards).
+ * Magic Stamp accrual STARTS at phone verification (Hieu's final rule). An iPOS
+ * order earns a stamp only when its phone matches a `profiles` row where
+ *   1. `phone_verified = true` AND `phone_verified_at IS NOT NULL`, and
+ *   2. `order.ordered_at >= phone_verified_at`.
+ * Orders placed BEFORE verification NEVER earn — there are no retroactive stamps.
+ * A phone merely *present* on a profile (the older phone-OTP signup path) does not
+ * count until the customer retro-verifies via Zalo OTP (TSK-149). Every order is
+ * still persisted in `ipos_orders` (applyIposOrders) for BYO/preference linking,
+ * but pre-verification orders are never stamped — not at import, not on verify.
  *
  * Idempotent on the iPOS `tran_id`: every stamp_entry carries `ipos_tran_id`
  * (unique) and `source='ipos_eod'`, so re-importing the same file inserts
@@ -29,11 +29,11 @@ const MAX_STAMPS = STAMPS_REQUIRED;
 const IPOS_SOURCE = "ipos_eod";
 const REWARD_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
-/** A registered customer with a verified mobile (profiles.phone is OTP-only). */
+/** A phone_verified web account + the moment earning starts (TSK-155 gate). */
 export type VerifiedAccount = {
   userId: string;
-  /** Signup moment (`profiles.created_at`) as epoch ms — the eligibility cutoff. */
-  signupAt: number;
+  /** `profiles.phone_verified_at` as epoch ms — orders before this never earn. */
+  verifiedAt: number;
 };
 
 export type CardRow = {
@@ -56,8 +56,8 @@ export type InsertResult = { ok: true } | { ok: false; duplicate: boolean };
 /** The narrow set of DB operations `applyStamps` needs. */
 export interface StampStore {
   /**
-   * Resolve a registered + verified account by phone, or null when the phone
-   * has no web account (so it earns no stamps).
+   * Resolve a phone_verified web account by phone, or null when the phone has no
+   * verified web account (so it earns no stamps until the customer verifies).
    */
   findVerifiedAccountByPhone(phone: string): Promise<VerifiedAccount | null>;
   /** True if a stamp_entry already exists for this iPOS order (idempotency). */
@@ -81,10 +81,12 @@ export type ApplyStampsSummary = {
   attributable: number;
   inserted: number;
   skippedExisting: number;
-  /** Phone had no registered/verified web account. */
+  /** Phone had no phone_verified web account. */
   skippedNoAccount: number;
-  /** Order predates the account's signup (or has no usable date). */
-  skippedPreSignup: number;
+  /** Order had no usable date (can't stamp earned_at). */
+  skippedUndated: number;
+  /** Order was placed before the account's phone_verified_at (no retro stamps). */
+  skippedPreVerification: number;
   newCards: number;
   errors: number;
 };
@@ -122,7 +124,8 @@ export async function applyStamps(
     inserted: 0,
     skippedExisting: 0,
     skippedNoAccount: 0,
-    skippedPreSignup: 0,
+    skippedUndated: 0,
+    skippedPreVerification: 0,
     newCards: 0,
     errors: 0,
   };
@@ -143,20 +146,27 @@ export async function applyStamps(
       continue;
     }
 
-    // 2. Eligibility: must be a registered + verified web account.
+    // 2. Eligibility (TSK-155): phone must match a phone_verified web account.
     const account = await accountFor(order.phone);
     if (!account) {
       summary.skippedNoAccount++;
       continue;
     }
 
-    // 3. Stamps start at signup — pre-signup (or undated) orders don't count.
-    if (order.tran_date === null || order.tran_date < account.signupAt) {
-      summary.skippedPreSignup++;
+    // 3. Need a usable date to compare against the verification cutoff.
+    if (order.tran_date === null) {
+      summary.skippedUndated++;
       continue;
     }
 
-    // 4. Find the open collecting card, or roll to a fresh one.
+    // 4. Earning STARTS at verification (TSK-155 final): orders placed before
+    //    phone_verified_at NEVER earn — no retroactive stamps.
+    if (order.tran_date < account.verifiedAt) {
+      summary.skippedPreVerification++;
+      continue;
+    }
+
+    // 5. Find the open collecting card, or roll to a fresh one.
     let card = await store.findCollectingCard(account.userId);
     if (!card || card.stamps_collected >= MAX_STAMPS) {
       card = await store.createCard(account.userId);
@@ -166,7 +176,7 @@ export async function applyStamps(
     const nextStamp = card.stamps_collected + 1;
     const earnedAt = new Date(order.tran_date).toISOString();
 
-    // 5. Insert the stamp. A duplicate tran_id here means a concurrent/re-run
+    // 6. Insert the stamp. A duplicate tran_id here means a concurrent/re-run
     //    insert beat us — treat as already-imported, not an error.
     const res = await store.insertEntry({
       card_id: card.id,
@@ -185,7 +195,7 @@ export async function applyStamps(
 
     summary.inserted++;
 
-    // 6. Advance the card; fill → reward_ready (next order opens a new card).
+    // 7. Advance the card; fill → reward_ready (next order opens a new card).
     await store.updateCardProgress(card.id, nextStamp, nextStamp >= MAX_STAMPS, earnedAt);
   }
 
@@ -207,16 +217,22 @@ const PG_UNIQUE_VIOLATION = "23505";
 export function createSupabaseStampStore(supabase: SupabaseClient): StampStore {
   return {
     async findVerifiedAccountByPhone(phone) {
-      // profiles.phone is set ONLY via the OTP-verified signup/reset flow, so a
-      // matching row == a verified mobile. created_at == the signup moment.
+      // TSK-155 gate: a phone earns stamps ONLY when it matches a profile with
+      // phone_verified = true AND a non-null phone_verified_at — and only for
+      // orders placed on/after that moment (the caller enforces the cutoff).
       const { data } = await supabase
         .from("profiles")
-        .select("id, created_at")
+        .select("id, phone_verified_at")
         .eq("phone", phone)
+        .eq("phone_verified", true)
+        .not("phone_verified_at", "is", null)
         .maybeSingle();
-      if (!data) return null;
-      const signupAt = Date.parse(data.created_at);
-      return { userId: data.id, signupAt: Number.isNaN(signupAt) ? 0 : signupAt };
+      if (!data || !data.phone_verified_at) return null;
+      const verifiedAt = Date.parse(data.phone_verified_at);
+      // A profile flagged verified with an unparseable timestamp can't be given a
+      // safe cutoff — skip rather than risk crediting pre-verification orders.
+      if (Number.isNaN(verifiedAt)) return null;
+      return { userId: data.id, verifiedAt };
     },
 
     async hasEntryForTranId(tranId) {

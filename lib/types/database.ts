@@ -26,12 +26,16 @@ export type Profile = {
   phone: string | null;
   /**
    * Whether `phone` was proven via Zalo OTP (TSK-149 retro-verify). Defaults
-   * false on every existing row at migration time — it is NOT a backfill of the
-   * older phone-OTP signup path, and is NOT used to gate TSK-148 stamp
-   * eligibility (which still keys on `phone` presence). It marks the explicit
-   * retro-verification only. `phone_verified_at` is the moment it flipped true.
+   * false on every existing row at migration time. Since TSK-155 this gates iPOS
+   * stamp + BYO attribution (Hieu's rule): a phone merely present no longer earns
+   * — only `phone_verified = true` does. Magic Stamp accrual STARTS at
+   * `phone_verified_at`: orders placed before that moment never earn (no
+   * retroactive stamps). Pre-TSK-155 phone-OTP accounts must retro-verify to
+   * start earning; their past orders/bowls are persisted and LINKED on verify
+   * (for history), but only on/after-verification orders are stamped.
    */
   phone_verified: boolean;
+  /** Epoch the phone was proven; the cutoff from which orders earn stamps (TSK-155). */
   phone_verified_at: string | null;
   contact_phone: string | null;
   /**
@@ -71,6 +75,26 @@ export type PhoneOtpPending = {
   purpose: OtpPurpose;
   expires_at: string;
   attempts: number;
+  created_at: string;
+};
+
+/**
+ * Row of public.ipos_orders (TSK-155, Option B). Every attributable iPOS EOD
+ * order is persisted here (one row per `ipos_tran_id`), whether or not a verified
+ * web account exists yet. Unverified/unmatched orders carry `profile_id` NULL and
+ * are LINKED to the profile when the customer later verifies (so they can see
+ * their history) — but pre-verification orders are NEVER stamped (earning starts
+ * at `phone_verified_at`). Customer reads are owner-scoped via RLS
+ * (profile_id = auth.uid()).
+ */
+export type IposOrder = {
+  id: string;
+  ipos_tran_id: string;
+  store_id: string | null;
+  phone: string | null;
+  profile_id: string | null;
+  ordered_at: string;
+  source: string;
   created_at: string;
 };
 

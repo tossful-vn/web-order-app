@@ -4,7 +4,7 @@
 const VI = {
   section: "Xác minh số điện thoại qua Zalo",
   intro:
-    "Xác minh số điện thoại để nhận lại tem Magic Stamp và lịch sử bowl đã tích luỹ tại quầy.",
+    "Xác minh số điện thoại để bắt đầu tích tem Magic Stamp và liên kết lịch sử bowl đã đặt tại quầy.",
   verified_label: "Đã xác minh",
   verified_note: "Số điện thoại của bạn đã được xác minh qua Zalo.",
   phone_label: "Số điện thoại",
@@ -21,15 +21,15 @@ const VI = {
   mock_hint: "(chế độ thử — xem mã trong log máy chủ)",
   ok_title: "Đã xác minh thành công!",
   linked_bowls: "bowl đã được liên kết vào tài khoản",
-  linked_none: "Không có dữ liệu cũ nào để liên kết.",
+  linked_none: "Chưa có lịch sử bowl nào để liên kết.",
   stamps_note:
-    "Tem cũ không thể khôi phục từ dữ liệu đã lưu — từ giờ các đơn của bạn sẽ tự tính tem.",
+    "Từ giờ mỗi đơn của bạn sẽ tự tích tem Magic Stamp. Chúng tôi cũng đã ghi nhận lịch sử bowl yêu thích của bạn.",
 };
 
 const EN = {
   section: "Verify your phone via Zalo",
   intro:
-    "Verify your phone to reclaim Magic Stamps and the bowl history you built up at the counter.",
+    "Verify your phone to start earning Magic Stamps and link the bowl history you built up at the counter.",
   verified_label: "Verified",
   verified_note: "Your phone has been verified via Zalo.",
   phone_label: "Phone",
@@ -46,9 +46,9 @@ const EN = {
   mock_hint: "(test mode — check the server log for the code)",
   ok_title: "Verified!",
   linked_bowls: "bowls linked to your account",
-  linked_none: "No past data to link.",
+  linked_none: "No past bowl history to link yet.",
   stamps_note:
-    "Old stamps can't be restored from stored data — from now on your orders earn stamps automatically.",
+    "From now on every order earns Magic Stamps. We've also recognised your past bowl history.",
 };
 
 import { useState } from "react";

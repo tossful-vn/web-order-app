@@ -219,12 +219,19 @@ test("sendZnsOtp — mocks (logs + ok) when no creds in env", async () => {
   );
 });
 
-/* ───────────────────────── back-fill ───────────────────────── */
+/* ───────────────────────── back-fill (TSK-155) ───────────────────────── */
 
 type Bowl = { id: string; phone: string | null; profile_id: string | null };
+type Order = { tran_id: string; phone: string | null; profile_id: string | null };
 
-/** In-memory BackfillStore over a list of byo_bowls rows. */
-function memBackfill(bowls: Bowl[]) {
+/**
+ * In-memory BackfillStore over byo_bowls + ipos_orders rows. On verify it LINKS
+ * matching unlinked rows onto the profile (for history). It mints NO stamps —
+ * earning starts at phone_verified_at (TSK-155), enforced in applyStamps, not here.
+ */
+function memBackfill(opts: { bowls: Bowl[]; orders: Order[] }) {
+  const { bowls, orders } = opts;
+
   const store: BackfillStore = {
     async linkByoBowlsByPhone(phone, profileId) {
       let n = 0;
@@ -236,29 +243,51 @@ function memBackfill(bowls: Bowl[]) {
       }
       return n;
     },
-    async linkStampsByPhone() {
-      return 0; // no phone-keyed stamp rows exist (see backfill.ts note)
+    async linkIposOrdersByPhone(phone, profileId) {
+      let n = 0;
+      for (const o of orders) {
+        if (o.phone === phone && o.profile_id == null) {
+          o.profile_id = profileId;
+          n++;
+        }
+      }
+      return n;
     },
   };
-  return { store, bowls };
+  return { store, bowls, orders };
 }
 
-test("backfillForVerifiedPhone — links matching unlinked bowls, idempotent on re-run", async () => {
-  const { store, bowls } = memBackfill([
-    { id: "b1", phone: PHONE, profile_id: null }, // match → link
-    { id: "b2", phone: PHONE, profile_id: null }, // match → link
-    { id: "b3", phone: PHONE, profile_id: "other" }, // already linked → skip
-    { id: "b4", phone: "0900000001", profile_id: null }, // other phone → skip
-    { id: "b5", phone: null, profile_id: null }, // anonymous → skip
-  ]);
+test("backfillForVerifiedPhone — links bowls + orders (no stamps), idempotent on re-run", async () => {
+  const { store, bowls, orders } = memBackfill({
+    bowls: [
+      { id: "b1", phone: PHONE, profile_id: null }, // match → link
+      { id: "b2", phone: PHONE, profile_id: null }, // match → link
+      { id: "b3", phone: PHONE, profile_id: "other" }, // already linked → skip
+      { id: "b4", phone: "0900000001", profile_id: null }, // other phone → skip
+      { id: "b5", phone: null, profile_id: null }, // anonymous → skip
+    ],
+    orders: [
+      { tran_id: "o1", phone: PHONE, profile_id: null }, // match → link (history only)
+      { tran_id: "o2", phone: PHONE, profile_id: null }, // match → link (history only)
+      { tran_id: "o3", phone: PHONE, profile_id: null }, // match → link (history only)
+      { tran_id: "o4", phone: "0900000001", profile_id: null }, // other phone → skip
+    ],
+  });
 
   const first = await backfillForVerifiedPhone(store, PHONE, "me");
   assert.equal(first.byoBowlsLinked, 2, "two phone-only bowls linked");
-  assert.equal(first.stampsLinked, 0, "no phone-keyed stamp rows to link");
+  assert.equal(first.iposOrdersLinked, 3, "three persisted orders linked for history");
+  // No stampsBackfilled field exists — verification never mints retroactive stamps.
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(first, "stampsBackfilled"),
+    false,
+    "back-fill summary carries no stamp count (no retro stamps)",
+  );
   assert.equal(bowls.find((b) => b.id === "b1")!.profile_id, "me");
   assert.equal(bowls.find((b) => b.id === "b3")!.profile_id, "other", "existing link untouched");
-  assert.equal(bowls.find((b) => b.id === "b4")!.profile_id, null);
+  assert.equal(orders.find((o) => o.tran_id === "o4")!.profile_id, null, "other phone untouched");
 
   const second = await backfillForVerifiedPhone(store, PHONE, "me");
-  assert.equal(second.byoBowlsLinked, 0, "re-verify links nothing new (idempotent)");
+  assert.equal(second.byoBowlsLinked, 0, "re-verify links no new bowls");
+  assert.equal(second.iposOrdersLinked, 0, "re-verify links no new orders");
 });

@@ -4,9 +4,9 @@
  * Unlike Magic Stamps (web-account holders only), the BYO archive keeps EVERY
  * bowl it can attribute to a line id — even ones with no web account — so the
  * recs layer has aggregate trends as well as per-customer history:
- *   - phone matches a `profiles` row → link `profile_id` (and keep the phone),
- *   - phone present but no account     → keep the phone, `profile_id` null,
- *   - no attributable phone            → archive anyway, phone + profile null.
+ *   - phone matches a phone_verified `profiles` row → link `profile_id` (TSK-155),
+ *   - phone present but no verified account → keep the phone, `profile_id` null,
+ *   - no attributable phone                 → archive anyway, phone + profile null.
  * Bowls with no usable order date are skipped (the column is NOT NULL and an
  * undated archive row is useless for trends).
  *
@@ -178,12 +178,14 @@ const PG_UNIQUE_VIOLATION = "23505";
 export function createSupabaseByoStore(supabase: SupabaseClient): ByoStore {
   return {
     async findProfileIdByPhone(phone) {
-      // profiles.phone is set ONLY via the OTP-verified signup/reset flow, so a
-      // matching row is a real, verified web account for this customer.
+      // TSK-155 gate: link a bowl to an account ONLY when the phone matches a
+      // profile with phone_verified = true. Unverified/unmatched bowls are still
+      // archived phone-only (profile_id NULL) and linked later on verify.
       const { data } = await supabase
         .from("profiles")
         .select("id")
         .eq("phone", phone)
+        .eq("phone_verified", true)
         .maybeSingle();
       return data?.id ?? null;
     },

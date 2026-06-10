@@ -18,6 +18,11 @@ import {
   type CardRow,
   type VerifiedAccount,
 } from "@/lib/ipos/applyStamps";
+import {
+  applyIposOrders,
+  type IposOrderStore,
+  type NewIposOrder,
+} from "@/lib/ipos/applyIposOrders";
 
 const HN_STORE_ID = "store-hn-uuid";
 
@@ -122,8 +127,8 @@ test("parseEodOrders — handles envelope + stringified extra_data", () => {
 type MemCard = CardRow & { user_id: string };
 
 /**
- * In-memory StampStore. `accounts` maps a verified phone → its account
- * (userId + signupAt epoch ms). A phone absent from the map has no web account.
+ * In-memory StampStore. `accounts` maps a phone_verified phone → its account
+ * (userId). A phone absent from the map has no verified web account.
  */
 function memStore(accounts: Record<string, VerifiedAccount> = {}) {
   const cards: MemCard[] = [];
@@ -178,31 +183,96 @@ function memStore(accounts: Record<string, VerifiedAccount> = {}) {
   return { store, cards, entries };
 }
 
-const REG = "0936336649"; // registered + verified, signed up at t=100
-const acct = (signupAt: number): VerifiedAccount => ({ userId: "user-123", signupAt });
-function ord(tran_id: string, phone: string, tran_date: number): ParsedOrder {
+const REG = "0936336649"; // a phone_verified web account
+const VERIFIED_AT = 100; // phone_verified_at as epoch ms — earning starts here
+const acct = (verifiedAt = 0): VerifiedAccount => ({ userId: "user-123", verifiedAt });
+function ord(tran_id: string, phone: string, tran_date: number | null): ParsedOrder {
   return { tran_id, tran_no: tran_id, store_id: HN_STORE_ID, phone, tran_date };
 }
 
-test("applyStamps — stamps only registered+verified, post-signup orders", async () => {
-  const { store, entries, cards } = memStore({ [REG]: acct(100) });
+/**
+ * Build the accounts map the way the live adapter does: ONLY profiles with
+ * phone_verified = true AND a phone_verified_at resolve to an account, carrying
+ * that timestamp as the earning cutoff (TSK-155 gate). Others resolve to null.
+ */
+function accountsFromProfiles(
+  profiles: Array<{
+    phone: string;
+    userId: string;
+    phone_verified: boolean;
+    phone_verified_at: number | null;
+  }>,
+): Record<string, VerifiedAccount> {
+  const map: Record<string, VerifiedAccount> = {};
+  for (const p of profiles) {
+    if (p.phone_verified && p.phone_verified_at != null) {
+      map[p.phone] = { userId: p.userId, verifiedAt: p.phone_verified_at };
+    }
+  }
+  return map;
+}
+
+test("applyStamps — earning starts at verification: pre-verification orders earn 0", async () => {
+  const { store, entries, cards } = memStore({ [REG]: acct(VERIFIED_AT) });
   const orders = [
-    ord("o1", REG, 150), // ✓ post-signup
-    ord("o2", REG, 200), // ✓ post-signup
-    ord("o3", REG, 50), // ✗ pre-signup
-    ord("o4", "0900000001", 300), // ✗ no web account
+    ord("o1", REG, VERIFIED_AT - 50), // ✗ before phone_verified_at → no retro stamp
+    ord("o2", REG, VERIFIED_AT), // ✓ exactly at verification → earns
+    ord("o3", REG, VERIFIED_AT + 50), // ✓ after verification → earns
+    ord("o4", "0900000001", VERIFIED_AT + 1), // ✗ no verified account
   ];
   const s = await applyStamps(store, orders);
-  assert.equal(s.inserted, 2);
+  assert.equal(s.inserted, 2, "only on/after-verification orders earn");
   assert.equal(entries.length, 2);
-  assert.equal(s.skippedPreSignup, 1);
+  assert.equal(s.skippedPreVerification, 1, "the pre-verification order is skipped");
   assert.equal(s.skippedNoAccount, 1);
-  assert.equal(s.newCards, 1); // one customer → one card
+  assert.equal(s.newCards, 1);
   assert.equal(cards[0].user_id, "user-123");
 });
 
-test("applyStamps — idempotent: same file twice = same stamp count", async () => {
+test("applyStamps — TSK-155 gate: unverified profile earns 0, verified earns 1/order", async () => {
+  // Phone present on a profile but phone_verified=false → no account → 0.
+  const unverified = memStore(
+    accountsFromProfiles([
+      { phone: REG, userId: "u1", phone_verified: false, phone_verified_at: null },
+    ]),
+  );
+  const a = await applyStamps(unverified.store, [ord("o1", REG, 100), ord("o2", REG, 200)]);
+  assert.equal(a.inserted, 0, "unverified phone earns nothing");
+  assert.equal(a.skippedNoAccount, 2);
+  assert.equal(unverified.entries.length, 0);
+
+  // Same profile verified at t=50 → both orders (100, 200) are on/after → 1 each.
+  const verified = memStore(
+    accountsFromProfiles([
+      { phone: REG, userId: "u1", phone_verified: true, phone_verified_at: 50 },
+    ]),
+  );
+  const b = await applyStamps(verified.store, [ord("o1", REG, 100), ord("o2", REG, 200)]);
+  assert.equal(b.inserted, 2, "verified phone earns 1/order on/after phone_verified_at");
+  assert.equal(verified.entries.length, 2);
+});
+
+test("applyStamps — verify-later mints NO retroactive stamps for past orders", async () => {
+  // Customer ordered for months (t=10,20,30) then verified at t=100. A re-run of
+  // applyStamps over those persisted orders mints nothing — no retro stamps.
   const { store, entries } = memStore({ [REG]: acct(100) });
+  const past = [ord("o1", REG, 10), ord("o2", REG, 20), ord("o3", REG, 30)];
+  const s = await applyStamps(store, past);
+  assert.equal(s.inserted, 0, "no historical stamps minted on verify");
+  assert.equal(s.skippedPreVerification, 3);
+  assert.equal(entries.length, 0);
+});
+
+test("applyStamps — undated order can't be stamped", async () => {
+  const { store, entries } = memStore({ [REG]: acct() });
+  const s = await applyStamps(store, [ord("o1", REG, null), ord("o2", REG, 200)]);
+  assert.equal(s.inserted, 1);
+  assert.equal(s.skippedUndated, 1);
+  assert.equal(entries.length, 1);
+});
+
+test("applyStamps — idempotent: same file twice = same stamp count", async () => {
+  const { store, entries } = memStore({ [REG]: acct() });
   const orders = [ord("o1", REG, 150), ord("o2", REG, 200), ord("o3", "0900000001", 300)];
 
   const first = await applyStamps(store, orders);
@@ -217,7 +287,7 @@ test("applyStamps — idempotent: same file twice = same stamp count", async () 
 });
 
 test("applyStamps — heavy customer rolls over at STAMPS_REQUIRED (no redemption)", async () => {
-  const { store, cards, entries } = memStore({ [REG]: acct(0) });
+  const { store, cards, entries } = memStore({ [REG]: acct() });
   const n = STAMPS_REQUIRED + 2; // fill one card + start the next
   const orders = Array.from({ length: n }, (_, i) => ord(`o${i}`, REG, i + 1));
   const s = await applyStamps(store, orders);
@@ -238,4 +308,58 @@ test("applyStamps — unregistered phone earns nothing", async () => {
   assert.equal(s.skippedNoAccount, 2);
   assert.equal(entries.length, 0);
   assert.equal(cards.length, 0);
+});
+
+/* ───────── applyIposOrders — Option B persistence (TSK-155) ───────── */
+
+/**
+ * In-memory IposOrderStore. `verifiedPhones` maps a verified phone → profile id;
+ * orders persist regardless, but only verified phones link a profile_id at write.
+ */
+function memOrderStore(verifiedPhones: Record<string, string> = {}) {
+  const rows: NewIposOrder[] = [];
+  const store: IposOrderStore = {
+    async findVerifiedProfileIdByPhone(phone) {
+      return verifiedPhones[phone] ?? null;
+    },
+    async insertOrder(order) {
+      if (rows.some((r) => r.ipos_tran_id === order.ipos_tran_id)) {
+        return { ok: false, duplicate: true };
+      }
+      rows.push(order);
+      return { ok: true };
+    },
+  };
+  return { store, rows };
+}
+
+test("applyIposOrders — persists ALL orders; links verified, leaves others unlinked", async () => {
+  const { store, rows } = memOrderStore({ [REG]: "user-123" });
+  const orders = [
+    ord("o1", REG, 100), // verified → linked
+    ord("o2", REG, 200), // verified → linked
+    ord("o3", "0900000001", 300), // unverified → persisted, unlinked
+    ord("o4", REG, null), // undated → skipped (ordered_at NOT NULL)
+  ];
+  const s = await applyIposOrders(store, orders);
+  assert.equal(s.inserted, 3, "every dated order persisted regardless of verification");
+  assert.equal(s.linkedToProfile, 2);
+  assert.equal(s.unlinked, 1);
+  assert.equal(s.skippedUndated, 1);
+  assert.equal(rows.length, 3);
+  assert.equal(rows.find((r) => r.ipos_tran_id === "o3")!.profile_id, null);
+  assert.equal(rows.find((r) => r.ipos_tran_id === "o1")!.profile_id, "user-123");
+});
+
+test("applyIposOrders — idempotent on ipos_tran_id (re-import persists 0 new)", async () => {
+  const { store, rows } = memOrderStore();
+  const orders = [ord("o1", REG, 100), ord("o2", REG, 200)];
+
+  const first = await applyIposOrders(store, orders);
+  assert.equal(first.inserted, 2);
+
+  const second = await applyIposOrders(store, orders);
+  assert.equal(second.inserted, 0);
+  assert.equal(second.skippedExisting, 2);
+  assert.equal(rows.length, 2, "re-import must not duplicate orders");
 });

@@ -1,38 +1,35 @@
 // NOTE: server-only — uses the service-role admin client (bypasses RLS to link
 // rows across customers' historical data). Never import from the browser.
 //
-// Retroactive back-fill on phone verification (TSK-149).
+// Retroactive linking on phone verification (TSK-149, gate finalised TSK-155).
 //
 // When an existing customer verifies a phone via Zalo OTP, link the historical
 // iPOS rows recorded against that NORMALISED phone (the same "0XXXXXXXXX" key
 // TSK-148's normalizeIposPhone produces) onto their web account.
 //
-// What CAN be linked by phone, and what cannot:
+// IMPORTANT (Hieu's final rule, TSK-155): Magic Stamp accrual STARTS at
+// verification — orders placed BEFORE phone_verified_at NEVER earn a stamp.
+// So verification mints NO retroactive stamps. What it DOES do:
 //
-//  • byo_bowls — archived for EVERY attributable order regardless of account
-//    (TSK-153). "phone-only" rows carry the phone with profile_id NULL, so a
-//    verified phone links them cleanly:  SET profile_id WHERE phone=? AND
-//    profile_id IS NULL.  Idempotent (a re-run links 0). This is the real,
-//    lossless back-fill.
+//  • byo_bowls — BYO is preference/taste data, not a reward, so we still link
+//    ALL of it. "phone-only" rows carry the phone with profile_id NULL; a
+//    verified phone links them cleanly: SET profile_id WHERE phone=? AND
+//    profile_id IS NULL.  Idempotent (a re-run links 0).
 //
-//  • Magic Stamps (stamp_cards / stamp_entries) — there is NO phone-keyed
-//    orphan row to link. stamp_cards.user_id is NOT NULL and applyStamps SKIPS
-//    any iPOS order whose phone has no verified web account at import time
-//    (summary.skippedNoAccount); those orders are not persisted anywhere
-//    (no transactions table). So historical stamps cannot be reconstructed from
-//    stored data — linkStampsByPhone returns 0. Going forward, now that the
-//    phone is verified + on the profile, the NEXT iPOS EOD import attributes the
-//    customer's orders normally. A full historical stamp back-fill needs the
-//    iPOS Hub re-pull (TSK-151) — out of scope here. The seam below is kept so
-//    TSK-151 can drop in the real implementation without touching callers.
+//  • ipos_orders — Option B (TSK-155) persists EVERY attributable order. We link
+//    the orphan rows (SET profile_id WHERE phone=? AND profile_id IS NULL) so the
+//    customer can see their order history under owner-read RLS. We do NOT replay
+//    them into stamps: pre-verification orders are never stamped, and future
+//    orders earn at import time via applyStamps' ordered_at >= phone_verified_at
+//    gate.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type BackfillSummary = {
   /** byo_bowls rows newly linked to the profile (phone match, was unlinked). */
   byoBowlsLinked: number;
-  /** Always 0 in the current schema — see module note (TSK-151 seam). */
-  stampsLinked: number;
+  /** ipos_orders rows newly linked to the profile (phone match, was unlinked). */
+  iposOrdersLinked: number;
 };
 
 /** The narrow set of DB operations the back-fill needs. */
@@ -44,15 +41,17 @@ export interface BackfillStore {
    */
   linkByoBowlsByPhone(phone: string, profileId: string): Promise<number>;
   /**
-   * Stamps have no phone-keyed orphan rows (see module note). Returns 0 until
-   * TSK-151 persists historical orders to replay.
+   * Link persisted iPOS orders whose phone matches and that aren't yet linked.
+   * Returns the number of rows linked. Idempotent (re-run links 0). Does NOT
+   * mint stamps — pre-verification orders never earn (TSK-155).
    */
-  linkStampsByPhone(phone: string, profileId: string): Promise<number>;
+  linkIposOrdersByPhone(phone: string, profileId: string): Promise<number>;
 }
 
 /**
- * Link every historical row attributable to `phone` onto `profileId`.
- * Idempotent + safe to re-run; reports per-target counts.
+ * Link every historical row attributable to `phone` onto `profileId`. Mints no
+ * stamps (earning starts at verification, TSK-155). Idempotent + safe to re-run;
+ * reports per-target link counts.
  */
 export async function backfillForVerifiedPhone(
   store: BackfillStore,
@@ -60,8 +59,8 @@ export async function backfillForVerifiedPhone(
   profileId: string
 ): Promise<BackfillSummary> {
   const byoBowlsLinked = await store.linkByoBowlsByPhone(phone, profileId);
-  const stampsLinked = await store.linkStampsByPhone(phone, profileId);
-  return { byoBowlsLinked, stampsLinked };
+  const iposOrdersLinked = await store.linkIposOrdersByPhone(phone, profileId);
+  return { byoBowlsLinked, iposOrdersLinked };
 }
 
 /* ───────────────────────── Supabase adapter ───────────────────────── */
@@ -84,10 +83,17 @@ export function createSupabaseBackfillStore(
       return data?.length ?? 0;
     },
 
-    async linkStampsByPhone() {
-      // No phone-keyed stamp rows exist to link (see module note). Future iPOS
-      // imports attribute this customer now the phone is verified on-profile.
-      return 0;
+    async linkIposOrdersByPhone(phone, profileId) {
+      // Same idempotency shape as bowls: only unlinked rows are touched. No
+      // stamps are minted here — earning starts at phone_verified_at (TSK-155).
+      const { data, error } = await supabase
+        .from("ipos_orders")
+        .update({ profile_id: profileId })
+        .eq("phone", phone)
+        .is("profile_id", null)
+        .select("id");
+      if (error) throw new Error(`linkIposOrdersByPhone failed: ${error.message}`);
+      return data?.length ?? 0;
     },
   };
 }
