@@ -4,7 +4,7 @@
 const VI = {
   section: "Xác minh số điện thoại qua Zalo",
   intro:
-    "Xác minh số điện thoại để nhận lại tem Magic Stamp và lịch sử bowl đã tích luỹ tại quầy.",
+    "Xác minh số điện thoại để bắt đầu tích tem Magic Stamp và liên kết lịch sử bowl đã đặt tại quầy.",
   verified_label: "Đã xác minh",
   verified_note: "Số điện thoại của bạn đã được xác minh qua Zalo.",
   phone_label: "Số điện thoại",
@@ -21,16 +21,15 @@ const VI = {
   mock_hint: "(chế độ thử — xem mã trong log máy chủ)",
   ok_title: "Đã xác minh thành công!",
   linked_bowls: "bowl đã được liên kết vào tài khoản",
-  linked_stamps: "tem đã được khôi phục từ các đơn cũ",
-  linked_none: "Không có dữ liệu cũ nào để liên kết.",
+  linked_none: "Chưa có lịch sử bowl nào để liên kết.",
   stamps_note:
-    "Các đơn mua tại quầy trước đây đã được tính tem — từ giờ đơn mới cũng tự tích tem.",
+    "Từ giờ mỗi đơn của bạn sẽ tự tích tem Magic Stamp. Chúng tôi cũng đã ghi nhận lịch sử bowl yêu thích của bạn.",
 };
 
 const EN = {
   section: "Verify your phone via Zalo",
   intro:
-    "Verify your phone to reclaim Magic Stamps and the bowl history you built up at the counter.",
+    "Verify your phone to start earning Magic Stamps and link the bowl history you built up at the counter.",
   verified_label: "Verified",
   verified_note: "Your phone has been verified via Zalo.",
   phone_label: "Phone",
@@ -47,10 +46,9 @@ const EN = {
   mock_hint: "(test mode — check the server log for the code)",
   ok_title: "Verified!",
   linked_bowls: "bowls linked to your account",
-  linked_stamps: "stamps restored from your past orders",
-  linked_none: "No past data to link.",
+  linked_none: "No past bowl history to link yet.",
   stamps_note:
-    "Your past counter orders have been credited — from now on new orders earn stamps automatically.",
+    "From now on every order earns Magic Stamps. We've also recognised your past bowl history.",
 };
 
 import { useState } from "react";
@@ -91,9 +89,7 @@ export default function PhoneVerify({
   const [maskedPhone, setMaskedPhone] = useState(
     initialVerified && initialPhone ? maskPhone(initialPhone) : ""
   );
-  const [linked, setLinked] = useState<{ bowls: number; stamps: number } | null>(
-    null
-  );
+  const [linked, setLinked] = useState<{ bowls: number } | null>(null);
 
   const send = async () => {
     if (busy) return;
@@ -124,7 +120,7 @@ export default function PhoneVerify({
         return;
       }
       setMaskedPhone(res.maskedPhone);
-      setLinked({ bowls: res.byoBowlsLinked, stamps: res.stampsBackfilled });
+      setLinked({ bowls: res.byoBowlsLinked });
       setStep("verified");
     } finally {
       setBusy(false);
@@ -237,13 +233,8 @@ export default function PhoneVerify({
           </p>
           {linked ? (
             <p className="text-xs text-kale-600">
-              {linked.bowls > 0 || linked.stamps > 0
-                ? [
-                    linked.stamps > 0 && `${linked.stamps} ${s.linked_stamps}`,
-                    linked.bowls > 0 && `${linked.bowls} ${s.linked_bowls}`,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ") + "."
+              {linked.bowls > 0
+                ? `${linked.bowls} ${s.linked_bowls}.`
                 : s.linked_none}
             </p>
           ) : (

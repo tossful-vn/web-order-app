@@ -118,16 +118,16 @@ async function main() {
     console.log(
       `\n[dry-run] no DB writes. ${distinctPhones} phones with a real number;` +
         ` ALL ${stats.attributable} attributable orders would be persisted to ipos_orders,` +
-        ` but only those whose phone has a phone_verified web account earn a stamp now` +
-        ` (the rest back-fill when the customer verifies).` +
+        ` but a stamp is earned only for an order placed on/after the customer's` +
+        ` phone_verified_at (no retroactive stamps).` +
         ` ${byo.stats.bowlsParsed} BYO bowls would be archived` +
         ` (${byo.stats.attributable} attributable across ${byo.stats.distinctPhones} customers).`,
     );
     return;
   }
 
-  // 3. Persist EVERY attributable order (idempotent on ipos_tran_id). This is the
-  //    Option B store that lets a later-verifier back-fill past stamps + BYO.
+  // 3. Persist EVERY attributable order (idempotent on ipos_tran_id). Option B:
+  //    orders are kept for history/BYO linking even when not (yet) stamp-eligible.
   const orderStore = createSupabaseIposOrderStore(supabase!);
   const orderSummary = await applyIposOrders(orderStore, orders);
 
@@ -140,7 +140,8 @@ async function main() {
   console.log(`  skipped (undated) . ${orderSummary.skippedUndated}`);
   if (orderSummary.errors) console.log(`  errors ............ ${orderSummary.errors}`);
 
-  // 4. Apply stamps (idempotent). Only phone_verified web accounts earn (TSK-155).
+  // 4. Apply stamps (idempotent). Earning starts at phone_verified_at (TSK-155):
+  //    only orders on/after the customer's verification moment earn.
   const store = createSupabaseStampStore(supabase!);
   const summary = await applyStamps(store, orders);
 
@@ -150,6 +151,7 @@ async function main() {
   console.log(`  inserted .......... ${summary.inserted}`);
   console.log(`  skipped (existing)  ${summary.skippedExisting}`);
   console.log(`  skipped (no acct) . ${summary.skippedNoAccount}`);
+  console.log(`  skipped (pre-verif) ${summary.skippedPreVerification}`);
   console.log(`  skipped (undated) . ${summary.skippedUndated}`);
   console.log(`  new cards ......... ${summary.newCards}`);
   if (summary.errors) console.log(`  errors ............ ${summary.errors}`);

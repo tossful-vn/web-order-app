@@ -184,56 +184,83 @@ function memStore(accounts: Record<string, VerifiedAccount> = {}) {
 }
 
 const REG = "0936336649"; // a phone_verified web account
-const acct = (): VerifiedAccount => ({ userId: "user-123" });
+const VERIFIED_AT = 100; // phone_verified_at as epoch ms — earning starts here
+const acct = (verifiedAt = 0): VerifiedAccount => ({ userId: "user-123", verifiedAt });
 function ord(tran_id: string, phone: string, tran_date: number | null): ParsedOrder {
   return { tran_id, tran_no: tran_id, store_id: HN_STORE_ID, phone, tran_date };
 }
 
 /**
- * Build the accounts map the way the live adapter does: ONLY phone_verified
- * profiles resolve to an account (TSK-155 gate). Unverified rows resolve to null.
+ * Build the accounts map the way the live adapter does: ONLY profiles with
+ * phone_verified = true AND a phone_verified_at resolve to an account, carrying
+ * that timestamp as the earning cutoff (TSK-155 gate). Others resolve to null.
  */
 function accountsFromProfiles(
-  profiles: Array<{ phone: string; userId: string; phone_verified: boolean }>,
+  profiles: Array<{
+    phone: string;
+    userId: string;
+    phone_verified: boolean;
+    phone_verified_at: number | null;
+  }>,
 ): Record<string, VerifiedAccount> {
   const map: Record<string, VerifiedAccount> = {};
-  for (const p of profiles) if (p.phone_verified) map[p.phone] = { userId: p.userId };
+  for (const p of profiles) {
+    if (p.phone_verified && p.phone_verified_at != null) {
+      map[p.phone] = { userId: p.userId, verifiedAt: p.phone_verified_at };
+    }
+  }
   return map;
 }
 
-test("applyStamps — verified phone earns 1 stamp per order (no signup cutoff)", async () => {
-  const { store, entries, cards } = memStore({ [REG]: acct() });
+test("applyStamps — earning starts at verification: pre-verification orders earn 0", async () => {
+  const { store, entries, cards } = memStore({ [REG]: acct(VERIFIED_AT) });
   const orders = [
-    ord("o1", REG, 150),
-    ord("o2", REG, 200),
-    ord("o3", REG, 50), // earns too — no pre-signup cutoff anymore (TSK-155)
-    ord("o4", "0900000001", 300), // ✗ no verified account
+    ord("o1", REG, VERIFIED_AT - 50), // ✗ before phone_verified_at → no retro stamp
+    ord("o2", REG, VERIFIED_AT), // ✓ exactly at verification → earns
+    ord("o3", REG, VERIFIED_AT + 50), // ✓ after verification → earns
+    ord("o4", "0900000001", VERIFIED_AT + 1), // ✗ no verified account
   ];
   const s = await applyStamps(store, orders);
-  assert.equal(s.inserted, 3, "every verified order earns one stamp");
-  assert.equal(entries.length, 3);
+  assert.equal(s.inserted, 2, "only on/after-verification orders earn");
+  assert.equal(entries.length, 2);
+  assert.equal(s.skippedPreVerification, 1, "the pre-verification order is skipped");
   assert.equal(s.skippedNoAccount, 1);
-  assert.equal(s.newCards, 1); // one customer → one card
+  assert.equal(s.newCards, 1);
   assert.equal(cards[0].user_id, "user-123");
 });
 
 test("applyStamps — TSK-155 gate: unverified profile earns 0, verified earns 1/order", async () => {
-  // Same phone present on a profile, but phone_verified=false → no account → 0.
+  // Phone present on a profile but phone_verified=false → no account → 0.
   const unverified = memStore(
-    accountsFromProfiles([{ phone: REG, userId: "u1", phone_verified: false }]),
+    accountsFromProfiles([
+      { phone: REG, userId: "u1", phone_verified: false, phone_verified_at: null },
+    ]),
   );
   const a = await applyStamps(unverified.store, [ord("o1", REG, 100), ord("o2", REG, 200)]);
   assert.equal(a.inserted, 0, "unverified phone earns nothing");
   assert.equal(a.skippedNoAccount, 2);
   assert.equal(unverified.entries.length, 0);
 
-  // Flip the same profile to verified → 1 stamp per order.
+  // Same profile verified at t=50 → both orders (100, 200) are on/after → 1 each.
   const verified = memStore(
-    accountsFromProfiles([{ phone: REG, userId: "u1", phone_verified: true }]),
+    accountsFromProfiles([
+      { phone: REG, userId: "u1", phone_verified: true, phone_verified_at: 50 },
+    ]),
   );
   const b = await applyStamps(verified.store, [ord("o1", REG, 100), ord("o2", REG, 200)]);
-  assert.equal(b.inserted, 2, "verified phone earns 1/order");
+  assert.equal(b.inserted, 2, "verified phone earns 1/order on/after phone_verified_at");
   assert.equal(verified.entries.length, 2);
+});
+
+test("applyStamps — verify-later mints NO retroactive stamps for past orders", async () => {
+  // Customer ordered for months (t=10,20,30) then verified at t=100. A re-run of
+  // applyStamps over those persisted orders mints nothing — no retro stamps.
+  const { store, entries } = memStore({ [REG]: acct(100) });
+  const past = [ord("o1", REG, 10), ord("o2", REG, 20), ord("o3", REG, 30)];
+  const s = await applyStamps(store, past);
+  assert.equal(s.inserted, 0, "no historical stamps minted on verify");
+  assert.equal(s.skippedPreVerification, 3);
+  assert.equal(entries.length, 0);
 });
 
 test("applyStamps — undated order can't be stamped", async () => {

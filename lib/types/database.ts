@@ -26,14 +26,16 @@ export type Profile = {
   phone: string | null;
   /**
    * Whether `phone` was proven via Zalo OTP (TSK-149 retro-verify). Defaults
-   * false on every existing row at migration time. Since TSK-155 this is the
-   * SOLE gate for iPOS stamp + BYO attribution (Hieu's rule): a phone merely
-   * present on a profile no longer earns — only `phone_verified = true` does.
-   * Pre-TSK-155 accounts that signed up via phone-OTP must retro-verify to start
-   * earning; their past orders are persisted in `ipos_orders` and back-fill on
-   * verify. `phone_verified_at` is the moment it flipped true.
+   * false on every existing row at migration time. Since TSK-155 this gates iPOS
+   * stamp + BYO attribution (Hieu's rule): a phone merely present no longer earns
+   * — only `phone_verified = true` does. Magic Stamp accrual STARTS at
+   * `phone_verified_at`: orders placed before that moment never earn (no
+   * retroactive stamps). Pre-TSK-155 phone-OTP accounts must retro-verify to
+   * start earning; their past orders/bowls are persisted and LINKED on verify
+   * (for history), but only on/after-verification orders are stamped.
    */
   phone_verified: boolean;
+  /** Epoch the phone was proven; the cutoff from which orders earn stamps (TSK-155). */
   phone_verified_at: string | null;
   contact_phone: string | null;
   /**
@@ -80,8 +82,10 @@ export type PhoneOtpPending = {
  * Row of public.ipos_orders (TSK-155, Option B). Every attributable iPOS EOD
  * order is persisted here (one row per `ipos_tran_id`), whether or not a verified
  * web account exists yet. Unverified/unmatched orders carry `profile_id` NULL and
- * are linked + replayed into stamps when the customer later verifies their phone.
- * Customer-facing reads are owner-scoped via RLS (profile_id = auth.uid()).
+ * are LINKED to the profile when the customer later verifies (so they can see
+ * their history) — but pre-verification orders are NEVER stamped (earning starts
+ * at `phone_verified_at`). Customer reads are owner-scoped via RLS
+ * (profile_id = auth.uid()).
  */
 export type IposOrder = {
   id: string;

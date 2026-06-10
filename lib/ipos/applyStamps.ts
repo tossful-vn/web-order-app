@@ -1,16 +1,15 @@
 /**
  * Apply Magic Stamps from parsed iPOS EOD orders (TSK-148, gate updated TSK-155).
  *
- * Magic Stamps are for verified WEB-ACCOUNT holders only. Hieu's rule (TSK-155):
- * an iPOS order earns a stamp only when its phone matches a `profiles` row with
- * `phone_verified = true`. A phone merely *present* on a profile (the older
- * phone-OTP signup path) no longer counts until the customer retro-verifies via
- * Zalo OTP (TSK-149). There is NO signup-date cutoff: every order attributable to
- * a verified phone earns one stamp, consistent with how BYO links all bowls — the
- * order itself is persisted in `ipos_orders` (applyIposOrders), so a customer who
- * verifies later back-fills every past order's stamp (lib/loyalty/backfill).
- * Orders from unverified / unmatched phones are skipped here (no phone-only
- * cards) but remain in `ipos_orders` to back-fill on verify.
+ * Magic Stamp accrual STARTS at phone verification (Hieu's final rule). An iPOS
+ * order earns a stamp only when its phone matches a `profiles` row where
+ *   1. `phone_verified = true` AND `phone_verified_at IS NOT NULL`, and
+ *   2. `order.ordered_at >= phone_verified_at`.
+ * Orders placed BEFORE verification NEVER earn — there are no retroactive stamps.
+ * A phone merely *present* on a profile (the older phone-OTP signup path) does not
+ * count until the customer retro-verifies via Zalo OTP (TSK-149). Every order is
+ * still persisted in `ipos_orders` (applyIposOrders) for BYO/preference linking,
+ * but pre-verification orders are never stamped — not at import, not on verify.
  *
  * Idempotent on the iPOS `tran_id`: every stamp_entry carries `ipos_tran_id`
  * (unique) and `source='ipos_eod'`, so re-importing the same file inserts
@@ -30,9 +29,11 @@ const MAX_STAMPS = STAMPS_REQUIRED;
 const IPOS_SOURCE = "ipos_eod";
 const REWARD_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
-/** A registered customer whose mobile is phone_verified = true (TSK-155 gate). */
+/** A phone_verified web account + the moment earning starts (TSK-155 gate). */
 export type VerifiedAccount = {
   userId: string;
+  /** `profiles.phone_verified_at` as epoch ms — orders before this never earn. */
+  verifiedAt: number;
 };
 
 export type CardRow = {
@@ -84,6 +85,8 @@ export type ApplyStampsSummary = {
   skippedNoAccount: number;
   /** Order had no usable date (can't stamp earned_at). */
   skippedUndated: number;
+  /** Order was placed before the account's phone_verified_at (no retro stamps). */
+  skippedPreVerification: number;
   newCards: number;
   errors: number;
 };
@@ -122,6 +125,7 @@ export async function applyStamps(
     skippedExisting: 0,
     skippedNoAccount: 0,
     skippedUndated: 0,
+    skippedPreVerification: 0,
     newCards: 0,
     errors: 0,
   };
@@ -149,14 +153,20 @@ export async function applyStamps(
       continue;
     }
 
-    // 3. Need a usable date to stamp earned_at. No signup-date cutoff (TSK-155):
-    //    every verified order counts, so a later-verifier reclaims all of them.
+    // 3. Need a usable date to compare against the verification cutoff.
     if (order.tran_date === null) {
       summary.skippedUndated++;
       continue;
     }
 
-    // 4. Find the open collecting card, or roll to a fresh one.
+    // 4. Earning STARTS at verification (TSK-155 final): orders placed before
+    //    phone_verified_at NEVER earn — no retroactive stamps.
+    if (order.tran_date < account.verifiedAt) {
+      summary.skippedPreVerification++;
+      continue;
+    }
+
+    // 5. Find the open collecting card, or roll to a fresh one.
     let card = await store.findCollectingCard(account.userId);
     if (!card || card.stamps_collected >= MAX_STAMPS) {
       card = await store.createCard(account.userId);
@@ -166,7 +176,7 @@ export async function applyStamps(
     const nextStamp = card.stamps_collected + 1;
     const earnedAt = new Date(order.tran_date).toISOString();
 
-    // 5. Insert the stamp. A duplicate tran_id here means a concurrent/re-run
+    // 6. Insert the stamp. A duplicate tran_id here means a concurrent/re-run
     //    insert beat us — treat as already-imported, not an error.
     const res = await store.insertEntry({
       card_id: card.id,
@@ -185,7 +195,7 @@ export async function applyStamps(
 
     summary.inserted++;
 
-    // 6. Advance the card; fill → reward_ready (next order opens a new card).
+    // 7. Advance the card; fill → reward_ready (next order opens a new card).
     await store.updateCardProgress(card.id, nextStamp, nextStamp >= MAX_STAMPS, earnedAt);
   }
 
@@ -208,15 +218,21 @@ export function createSupabaseStampStore(supabase: SupabaseClient): StampStore {
   return {
     async findVerifiedAccountByPhone(phone) {
       // TSK-155 gate: a phone earns stamps ONLY when it matches a profile with
-      // phone_verified = true (a phone merely present no longer counts).
+      // phone_verified = true AND a non-null phone_verified_at — and only for
+      // orders placed on/after that moment (the caller enforces the cutoff).
       const { data } = await supabase
         .from("profiles")
-        .select("id")
+        .select("id, phone_verified_at")
         .eq("phone", phone)
         .eq("phone_verified", true)
+        .not("phone_verified_at", "is", null)
         .maybeSingle();
-      if (!data) return null;
-      return { userId: data.id };
+      if (!data || !data.phone_verified_at) return null;
+      const verifiedAt = Date.parse(data.phone_verified_at);
+      // A profile flagged verified with an unparseable timestamp can't be given a
+      // safe cutoff — skip rather than risk crediting pre-verification orders.
+      if (Number.isNaN(verifiedAt)) return null;
+      return { userId: data.id, verifiedAt };
     },
 
     async hasEntryForTranId(tranId) {

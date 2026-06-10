@@ -2,18 +2,19 @@
 -- Run in Supabase SQL Editor (or via apply_migration) BEFORE the next
 -- non-dry-run `npm run import:ipos`. Additive + IF-NOT-EXISTS guarded.
 --
--- Hieu's rule (TSK-155): a profile earns Magic Stamps AND BYO attribution ONLY
--- when profiles.phone_verified = true. The eligibility gate in applyStamps /
--- applyByoBowls flips from "profiles.phone present" to "phone_verified = true
--- AND phone matches" (the older phone-OTP signup path no longer counts until
--- the customer retro-verifies via Zalo OTP, TSK-149).
+-- Hieu's rule (TSK-155 final): Magic Stamp accrual STARTS at phone verification.
+-- An order earns a stamp only when its phone matches a profile with
+-- phone_verified = true AND phone_verified_at IS NOT NULL AND
+-- ordered_at >= phone_verified_at. Orders before verification NEVER earn — there
+-- are no retroactive stamps. BYO attribution is likewise gated on phone_verified.
 --
--- Option B: to make that loss-less, persist EVERY attributable iPOS order here
--- (one row per tran_id, phone-bearing — parseEodOrders already drops phoneless /
--- placeholder rows). Unverified/unmatched orders are stored with profile_id
--- NULL; when the customer later verifies, lib/loyalty/backfill links these rows
--- onto their profile AND replays them into stamp_entries (idempotent on
--- ipos_tran_id), so a later-verifier reclaims BOTH past stamps and BYO bowls.
+-- Option B: persist EVERY attributable iPOS order here (one row per tran_id,
+-- phone-bearing — parseEodOrders already drops phoneless / placeholder rows).
+-- Unverified/unmatched orders are stored with profile_id NULL; when the customer
+-- later verifies, lib/loyalty/backfill LINKS these rows onto their profile (so
+-- they can see their order history under RLS) and links their BYO bowls. It does
+-- NOT mint stamps for pre-verification orders. Future orders earn at import time
+-- via the ordered_at >= phone_verified_at gate.
 --
 -- Imports run as service-role (bypass RLS); the owner-read policy below only
 -- governs the customer-facing read path: a customer sees only their own orders.
@@ -31,7 +32,7 @@ CREATE TABLE IF NOT EXISTS public.ipos_orders (
   created_at    timestamptz DEFAULT now()
 );
 
--- Lookups the import + back-fill make (phone replay; owner reads).
+-- Lookups the import + back-fill make (phone link on verify; owner reads).
 CREATE INDEX IF NOT EXISTS ipos_orders_phone_idx      ON public.ipos_orders (phone);
 CREATE INDEX IF NOT EXISTS ipos_orders_profile_id_idx ON public.ipos_orders (profile_id);
 

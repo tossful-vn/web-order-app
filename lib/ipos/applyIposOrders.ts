@@ -1,16 +1,17 @@
 /**
  * Persist EVERY attributable iPOS EOD order into `ipos_orders` (TSK-155).
  *
- * Option B: stamps + BYO attribution are now gated on `profiles.phone_verified =
- * true` (Hieu's rule). To make that loss-less, we store every order parseEodOrders
- * keeps (one row per `tran_id`, always phone-bearing) regardless of whether a
- * verified account exists yet:
+ * Option B: stamp + BYO attribution are gated on `profiles.phone_verified = true`
+ * (Hieu's rule), and Magic Stamp accrual starts at `phone_verified_at`. We store
+ * every order parseEodOrders keeps (one row per `tran_id`, always phone-bearing)
+ * regardless of whether a verified account exists yet:
  *   - phone matches a VERIFIED profile → link `profile_id` at import time,
  *   - otherwise                        → store with `profile_id` NULL.
  * When the customer later verifies (lib/loyalty/backfill), the NULL rows are
- * linked onto their profile AND replayed into stamp_entries — so a later-verifier
- * reclaims both past stamps and BYO bowls. Orders with no usable date are skipped
- * (the column is NOT NULL and an undated order can't earn a dated stamp anyway).
+ * LINKED onto their profile so they can see their order history — but stamps are
+ * NEVER minted retroactively for pre-verification orders (applyStamps enforces
+ * the ordered_at >= phone_verified_at cutoff). Orders with no usable date are
+ * skipped (the column is NOT NULL and an undated order can't be dated/stamped).
  *
  * Idempotent on the iPOS `ipos_tran_id` (UNIQUE): re-importing the same file
  * inserts nothing new and never overwrites a `profile_id` linked since (we
