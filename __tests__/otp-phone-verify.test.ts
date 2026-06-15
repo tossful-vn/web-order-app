@@ -198,9 +198,13 @@ test("toZaloPhone — VN local → 84-form (idempotent)", () => {
 });
 
 test("sendZnsOtp — mocks (logs + ok) when no creds in env", async () => {
-  // Guard: the live creds must be absent for the mock path under test.
+  // Guard: the live OA creds must be absent for the mock path under test
+  // (TSK-156: mock gating keys on the OA app creds + ZNS template, not a static
+  // access token).
   assert.ok(
-    !process.env.ZALO_OA_ACCESS_TOKEN && !process.env.ZALO_ZNS_TEMPLATE_ID,
+    !process.env.ZALO_OA_APP_ID &&
+      !process.env.ZALO_OA_APP_SECRET &&
+      !process.env.ZALO_ZNS_TEMPLATE_ID,
     "ZNS env must be unset for the mock-path test"
   );
 
