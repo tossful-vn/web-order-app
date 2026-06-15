@@ -4,7 +4,7 @@
 // Zalo ZNS (Zalo Notification Service) OTP delivery (TSK-149, TSK-156).
 //
 // This adapter is the REAL send wired behind an env gate: when the OA app creds
-// (ZALO_OA_APP_ID + ZALO_OA_APP_SECRET) and a ZNS template (ZALO_ZNS_TEMPLATE_ID)
+// (ZALO_OA_APP_ID + ZALO_OA_APP_SECRET) and a ZNS template (ZALO_ZNS_OTP_TEMPLATE_ID)
 // are present, it acquires a DURABLE access_token from lib/auth/zaloOaToken (which
 // auto-refreshes the rotating OA token — TSK-156) and POSTs to the ZNS template
 // API. Otherwise — or until the initial OA token row is seeded — it MOCKS (logs
@@ -29,7 +29,7 @@ function znsConfigured(): boolean {
   return Boolean(
     process.env.ZALO_OA_APP_ID &&
       process.env.ZALO_OA_APP_SECRET &&
-      process.env.ZALO_ZNS_TEMPLATE_ID
+      process.env.ZALO_ZNS_OTP_TEMPLATE_ID
   );
 }
 
@@ -85,7 +85,7 @@ export async function sendZnsOtp(
     return { ok: true, mocked: true };
   }
 
-  const templateId = process.env.ZALO_ZNS_TEMPLATE_ID as string;
+  const templateId = process.env.ZALO_ZNS_OTP_TEMPLATE_ID as string;
 
   const body = {
     phone: toZaloPhone(phone),

@@ -204,7 +204,7 @@ test("sendZnsOtp — mocks (logs + ok) when no creds in env", async () => {
   assert.ok(
     !process.env.ZALO_OA_APP_ID &&
       !process.env.ZALO_OA_APP_SECRET &&
-      !process.env.ZALO_ZNS_TEMPLATE_ID,
+      !process.env.ZALO_ZNS_OTP_TEMPLATE_ID,
     "ZNS env must be unset for the mock-path test"
   );
 
