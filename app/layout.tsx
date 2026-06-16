@@ -34,6 +34,12 @@ const lora = Lora({
 export const metadata: Metadata = {
   title: "Tossful — Salad đặt online",
   description: "Đặt salad Tossful giao tận nơi hoặc nhận tại cửa hàng.",
+  other: {
+    // Zalo domain-ownership verification — required so the Zalo OA OAuth
+    // callback (app/api/zalo/oauth, TSK-156.2) can redirect back to
+    // my.tossful.com. Renders <meta name="zalo-platform-site-verification">.
+    "zalo-platform-site-verification": "GEU31hpG8rf9mxPwmy0-9YdKln35ecf7C34q",
+  },
 };
 
 export default function RootLayout({
