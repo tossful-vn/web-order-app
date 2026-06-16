@@ -1,13 +1,31 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { saveBowl } from "@/lib/bowls/actions";
+import { runSaveBowl } from "@/lib/bowls/save-branch";
 import { setPreferredStore } from "@/lib/profile/actions";
 import CityPromptModal from "@/lib/components/CityPromptModal.client";
 import type { BowlComposition } from "@/lib/types/database";
-import { useLang, type Lang } from "@/lib/lang";
+import { useLang, getStoredLang, type Lang } from "@/lib/lang";
+import BeaconsCta from "./BeaconsCta.client";
+import SaveSummaryModal, {
+  type BowlMacros,
+  type SummaryRow,
+} from "./SaveSummaryModal.client";
+import { captureSource } from "@/lib/analytics/source";
+import {
+  trackCalcLanded,
+  trackCalcSignaturePicked,
+  trackCalcByoStarted,
+  trackCalcIngredientAdded,
+  trackCalcIngredientRemoved,
+  trackCalcCompleted,
+  trackCalcSaveBowlClicked,
+  trackCalcBowlSaved,
+} from "@/lib/analytics/events";
 import {
   CATEGORY_BG,
   CATEGORY_ORDER,
@@ -245,6 +263,9 @@ const CITY_PROMPT_SKIP_KEY = "tossful:city_prompt_skipped";
 export default function Calculator({ isLoggedIn, initialCity, suggestedCity }: CalculatorProps) {
   const supabase = useMemo(() => createClient(), []);
   const [userName, setUserName] = useState<string | null>(null);
+  // profiles.phone_verified (TSK-149/155) — drives the Magic-Stamp line shown
+  // after a logged-in save. null until the profile loads / for anonymous users.
+  const [phoneVerified, setPhoneVerified] = useState<boolean | null>(null);
   // City-based pricing (D8 / TSK-130): null until the customer picks a store.
   // While null, every price stays hidden and the lazy prompt can fire.
   const [city, setCity] = useState<StoreCity | null>(initialCity);
@@ -263,7 +284,7 @@ export default function Calculator({ isLoggedIn, initialCity, suggestedCity }: C
       const [{ data: profile }, { data: savedBowls }] = await Promise.all([
         supabase
           .from("profiles")
-          .select("display_name")
+          .select("display_name, phone_verified")
           .eq("id", user.id)
           .maybeSingle(),
         supabase
@@ -274,6 +295,7 @@ export default function Calculator({ isLoggedIn, initialCity, suggestedCity }: C
           .limit(80),
       ]);
       if (cancelled) return;
+      setPhoneVerified(profile?.phone_verified === true);
       const dn = (profile?.display_name ?? "").trim();
       if (dn) {
         setUserName(dn.split(/\s+/)[0]); // first word only — friendlier
@@ -345,7 +367,27 @@ export default function Calculator({ isLoggedIn, initialCity, suggestedCity }: C
   const [hydrated, setHydrated] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const router = useRouter();
+  // Logged-in save confirmation toast { verified } (TSK-169). Replaces the old
+  // redirect-to-bowl-detail so the customer stays on the marketing surface.
+  const [savedToast, setSavedToast] = useState<{ verified: boolean } | null>(null);
+  // Anonymous save popup (TSK-169) — screenshot helper + loyalty on-ramp, NO
+  // DB write. Holds the snapshot to render in SaveSummaryModal.
+  const [savePopup, setSavePopup] = useState<{
+    bowlName: string;
+    macros: BowlMacros;
+    rows: SummaryRow[];
+  } | null>(null);
+
+  // ── Analytics instrumentation guards (fire-once per build) ──────────────
+  const byoStartedRef = useRef(false);
+  const completedRef = useRef(false);
+  // Fire trackCalcByoStarted the first time the customer adds an ingredient by
+  // hand (signature applies set state via useBowl, not these handlers).
+  const noteByoStart = useCallback(() => {
+    if (byoStartedRef.current) return;
+    byoStartedRef.current = true;
+    trackCalcByoStarted(lang);
+  }, [lang]);
 
   // Brand-site mode: tossful.com/calculator proxies this page with ?src=brand-site.
   // Phase 1 is calc-only + no auth, so hide save/account affordances. Absent the
@@ -355,6 +397,15 @@ export default function Calculator({ isLoggedIn, initialCity, suggestedCity }: C
 
   // Restore hydration flag after first render (used by other effects)
   useEffect(() => { setHydrated(true); }, []);
+
+  // TSK-169 — capture first-touch marketing source (?src + utm_*) before any
+  // event fires, then log the landing. Once per mount. getStoredLang() reads
+  // the persisted locale directly (useLang hasn't hydrated on first commit).
+  useEffect(() => {
+    captureSource(typeof window !== "undefined" ? window.location.search : "");
+    trackCalcLanded(getStoredLang());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Lazy city prompt (TSK-130). Fire the first time a logged-in customer with
   // no chosen store reaches the price-bearing "edit" view. Guests, brand-site
@@ -625,9 +676,25 @@ export default function Calculator({ isLoggedIn, initialCity, suggestedCity }: C
     return { rows, totalG, totalCal, totalPrice: finalPrice, isSignaturePrice: isPristineSignature };
   }, [selected, items, city, isPristineSignature, signatureItem]);
 
+  // TSK-169 — "completed" fires once, the first time the bowl has at least one
+  // Base and one Topping (a viable bowl). ingredient_count = distinct picks.
+  useEffect(() => {
+    if (completedRef.current) return;
+    const base = countsByCategory["Base"] ?? 0;
+    const topping = countsByCategory["Topping"] ?? 0;
+    if (base >= 1 && topping >= 1) {
+      completedRef.current = true;
+      trackCalcCompleted(lang, {
+        ingredient_count: Object.keys(selected).length,
+        kcal: Math.round(totals.cal),
+      });
+    }
+  }, [countsByCategory, selected, totals, lang]);
+
   // ===== Handlers =====
   const toggleChip = useCallback(
     (item: Item) => {
+      const wasOn = item.id in selected;
       setSelected((prev) => {
         const next = { ...prev };
         if (SINGLE_SELECT.has(item.category)) {
@@ -642,15 +709,32 @@ export default function Calculator({ isLoggedIn, initialCity, suggestedCity }: C
         else next[item.id] = 1;
         return next;
       });
+      const distinct = Object.keys(selected).length;
+      const meta = { ingredient_id: item.id, ingredient: pickName(item, lang), category: item.category };
+      if (wasOn) {
+        trackCalcIngredientRemoved(lang, { ...meta, ingredient_count: distinct - 1 });
+      } else {
+        noteByoStart();
+        trackCalcIngredientAdded(lang, { ...meta, ingredient_count: distinct + 1 });
+      }
     },
-    [items]
+    [items, selected, lang, noteByoStart]
   );
 
   const incrementQty = useCallback((item: Item) => {
+    const isNew = !(item.id in selected);
     setSelected((prev) => ({ ...prev, [item.id]: (prev[item.id] ?? 0) + 1 }));
-  }, []);
+    if (isNew) noteByoStart();
+    trackCalcIngredientAdded(lang, {
+      ingredient_id: item.id,
+      ingredient: pickName(item, lang),
+      category: item.category,
+      ingredient_count: Object.keys(selected).length + (isNew ? 1 : 0),
+    });
+  }, [selected, lang, noteByoStart]);
 
   const decrementQty = useCallback((item: Item) => {
+    const willRemove = (selected[item.id] ?? 0) <= 1;
     setSelected((prev) => {
       const cur = prev[item.id] ?? 0;
       const next = { ...prev };
@@ -658,15 +742,30 @@ export default function Calculator({ isLoggedIn, initialCity, suggestedCity }: C
       else next[item.id] = cur - 1;
       return next;
     });
-  }, []);
+    trackCalcIngredientRemoved(lang, {
+      ingredient_id: item.id,
+      ingredient: pickName(item, lang),
+      category: item.category,
+      ingredient_count: Object.keys(selected).length - (willRemove ? 1 : 0),
+    });
+  }, [selected, lang]);
 
   const removeItem = useCallback((id: string) => {
+    const item = items.find((i) => i.id === id);
     setSelected((prev) => {
       const next = { ...prev };
       delete next[id];
       return next;
     });
-  }, []);
+    if (item) {
+      trackCalcIngredientRemoved(lang, {
+        ingredient_id: id,
+        ingredient: pickName(item, lang),
+        category: item.category,
+        ingredient_count: Object.keys(selected).length - 1,
+      });
+    }
+  }, [selected, lang, items]);
 
   const reset = useCallback(() => {
     setSelected({});
@@ -680,6 +779,7 @@ export default function Calculator({ isLoggedIn, initialCity, suggestedCity }: C
       const bowl = signatureBowls.find((b) => b.id === bowlId);
       if (!bowl) return;
       if (!bowl.customizable) return; // safety: button shouldn't be visible
+      trackCalcSignaturePicked(lang, bowl.name);
       setLastAppliedSignature(bowl.name);
       const next: Record<string, number> = {};
       for (const comp of bowl.components) {
@@ -700,7 +800,7 @@ export default function Calculator({ isLoggedIn, initialCity, suggestedCity }: C
       setView("edit");
       if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
     },
-    [items, signatureBowls]
+    [items, signatureBowls, lang]
   );
 
   // ===== Render =====
@@ -738,14 +838,17 @@ export default function Calculator({ isLoggedIn, initialCity, suggestedCity }: C
     setBowlName(suggestBowlName(selected, items, lang));
   }, [selected, items, lang, bowlNameCustom, signatureSnapshot]);
 
-  // Save handler — Bundle 2 M2 wedge
+  // Save handler — TSK-169 Option C: branch on auth.
+  //  • logged-in → write to saved_bowls (real DB save) + toast w/ Magic-Stamp line
+  //  • anonymous → summary popup (screenshot helper) + loyalty on-ramp, NO DB write
   const handleSave = useCallback(async () => {
     setSaveError(null);
-    if (Object.keys(selected).length === 0) {
+    setSavedToast(null);
+    const ingredientCount = Object.keys(selected).length;
+    if (ingredientCount === 0) {
       setSaveError(I18N[lang].empty_alert);
       return;
     }
-    setSaving(true);
 
     // Build composition + macros payload
     const byCategory: Record<string, Item[]> = {};
@@ -789,35 +892,49 @@ export default function Calculator({ isLoggedIn, initialCity, suggestedCity }: C
       source_url: "/nutrition",
     };
 
-    // Check auth state
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (user) {
-      const result = await saveBowl(payload);
-      setSaving(false);
-      if ("error" in result) {
-        setSaveError(result.error);
-        return;
-      }
-      router.push("/account/bowls/" + result.id);
-    } else {
-      // Guest: stash to localStorage + redirect to login -> /account claims it
-      try {
-        window.localStorage.setItem(
-          "tossful:pending_bowl",
-          JSON.stringify(payload),
-        );
-      } catch {
-        // localStorage might be full/disabled — surface error
-        setSaving(false);
-        setSaveError("Could not save locally. Please sign in first.");
-        return;
-      }
-      router.push("/login?next=/account");
-    }
-  }, [selected, items, lang, bowlName, totals, lastAppliedSignature, lockedComponents, supabase, router]);
+    // Branch on auth (logged-in = DB save + stamp line; anonymous = popup +
+    // on-ramp, no DB write). Shared orchestrator keeps the decision testable.
+    await runSaveBowl(payload, {
+      getUser: async () => {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        return user ? { id: user.id } : null;
+      },
+      saveBowl,
+      onClick: (auth) =>
+        trackCalcSaveBowlClicked(lang, { auth, ingredient_count: ingredientCount }),
+      onSaving: setSaving,
+      onSaved: (id) => {
+        // Stay on the page; confirm with a toast + accurate Magic-Stamp line.
+        trackCalcBowlSaved(lang, {
+          bowl_id: id,
+          ingredient_count: ingredientCount,
+          phone_verified: phoneVerified === true,
+        });
+        setSavedToast({ verified: phoneVerified === true });
+      },
+      onError: setSaveError,
+      onAnonymous: () => {
+        const rows: SummaryRow[] = summaryRows.rows.map(({ item, cal }) => ({
+          id: item.id,
+          name: pickName(item, lang),
+          cal,
+        }));
+        setSavePopup({
+          bowlName: bowlName.trim() || I18N[lang].your_bowl,
+          macros: {
+            cal: totals.cal,
+            protein: totals.protein,
+            fat: totals.fat,
+            carbs: totals.carbs,
+            fiber: totals.fiber,
+          },
+          rows,
+        });
+      },
+    });
+  }, [selected, items, lang, bowlName, totals, lastAppliedSignature, lockedComponents, supabase, phoneVerified, summaryRows]);
 
   return (
     <div className="tossful-calc">
@@ -1211,6 +1328,23 @@ export default function Calculator({ isLoggedIn, initialCity, suggestedCity }: C
               </button>
             </div>
             {saveError && <div className="save-error">{saveError}</div>}
+            {/* Logged-in save confirmation + accurate Magic-Stamp line (TSK-169).
+                Saving a web bowl is NOT a stamp — stamps come from VERIFIED
+                in-store visits, so we either confirm accrual or link to verify. */}
+            {savedToast && (
+              <div className="save-toast" role="status">
+                <span className="save-toast-title">
+                  <i className="ti ti-circle-check" aria-hidden="true" /> {str.saved_toast}
+                </span>
+                {savedToast.verified ? (
+                  <span className="save-toast-line">{str.stamp_earning}</span>
+                ) : (
+                  <Link className="save-toast-link" href="/account">
+                    {str.stamp_verify}
+                  </Link>
+                )}
+              </div>
+            )}
             <div className="foot-note">{str.microcopy}</div>
 
             <div
@@ -1252,9 +1386,29 @@ export default function Calculator({ isLoggedIn, initialCity, suggestedCity }: C
                 })}
               </div>
             </div>
+
+            {/* Beacons acquisition CTA (TSK-169) — inline below the macros ring,
+                hidden until the bowl has 3+ ingredients. trigger='3-ingredient'. */}
+            {Object.keys(selected).length >= 3 && (
+              <div className="beacons-inline">
+                <BeaconsCta lang={lang} trigger="3-ingredient" variant="inline" />
+              </div>
+            )}
           </>
         )}
       </div>
+
+      {/* Anonymous "Save bowl" result (TSK-169) — screenshot summary + soft
+          loyalty on-ramp. NO DB write happened. */}
+      {savePopup && (
+        <SaveSummaryModal
+          lang={lang}
+          bowlName={savePopup.bowlName}
+          macros={savePopup.macros}
+          rows={savePopup.rows}
+          onClose={() => setSavePopup(null)}
+        />
+      )}
 
       {/* Lazy city prompt (TSK-130) — gates the first price display for a
           logged-in customer who hasn't chosen a store yet. */}

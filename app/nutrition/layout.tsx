@@ -1,27 +1,23 @@
 import { createClient } from "@/lib/supabase/server";
-import { getPreferredStore } from "@/lib/profile/preferred-store";
-import AppShell from "@/lib/components/AppShell.client";
+import MvpShell from "./MvpShell.client";
 
 /**
- * Public-friendly layout for /nutrition. Wraps page in the shared AppShell
- * (one-row header + drawer). Does not require auth — calculator must work
- * for guest visitors.
+ * Minimal, anonymous-first layout for /nutrition (TSK-169, Option C).
+ *
+ * Wraps the page in MvpShell (brand logo + EN/VI toggle + Beacons footer) —
+ * NOT AppShell. There is no auth wall: the calculator works for guests. We
+ * still resolve the Supabase session so the cookie is refreshed and downstream
+ * client code can branch on logged-in vs anonymous, but no auth UI is rendered.
+ * AppShell stays in place for /account, /byw, /loyalty.
  */
 export default async function NutritionLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // Touch the session so @supabase/ssr refreshes the auth cookie on navigation.
   const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const userObj = user ? { email: user.email } : null;
-  const preferredStore = user ? await getPreferredStore(user.id) : null;
+  await supabase.auth.getUser();
 
-  return (
-    <AppShell user={userObj} preferredStore={preferredStore}>
-      {children}
-    </AppShell>
-  );
+  return <MvpShell>{children}</MvpShell>;
 }

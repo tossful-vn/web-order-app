@@ -5,9 +5,37 @@ import { suggestStoreFromIp } from "@/lib/geo";
 import type { StoreCity } from "@/lib/types/database";
 import "./styles.css";
 
+const OG_TITLE = "Tossful — Nutrition calculator";
+const OG_DESCRIPTION =
+  "Build your bowl and see live nutrition. A bowl for everyone.";
+const OG_IMAGE = "/og/calc-kale_my_ex.png";
+
 export const metadata: Metadata = {
-  title: "Tossful — Nutrition calculator",
-  description: "Build your bowl and see live nutrition. A bowl for everyone.",
+  // Absolute base so the og/twitter image unfurls on Facebook / Zalo (TSK-169).
+  metadataBase: new URL("https://my.tossful.com"),
+  title: OG_TITLE,
+  description: OG_DESCRIPTION,
+  openGraph: {
+    title: OG_TITLE,
+    description: OG_DESCRIPTION,
+    url: "/nutrition",
+    siteName: "Tossful",
+    type: "website",
+    images: [
+      {
+        url: OG_IMAGE,
+        width: 1200,
+        height: 630,
+        alt: "Tossful nutrition calculator",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: OG_TITLE,
+    description: OG_DESCRIPTION,
+    images: [OG_IMAGE],
+  },
 };
 
 export default async function NutritionPage() {

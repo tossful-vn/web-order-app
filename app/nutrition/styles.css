@@ -280,3 +280,36 @@
   font-weight: 500;
   vertical-align: 1px;
 }
+
+/* TSK-169 — Beacons CTA spacing + logged-in save toast + Magic-Stamp line. */
+.tossful-calc .beacons-inline {
+  margin-top: 16px;
+}
+.tossful-calc .save-toast {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #E8F0E5;
+  border: 1px solid #C9DAC2;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.tossful-calc .save-toast-title {
+  font-weight: 600;
+  color: #0F563D;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.tossful-calc .save-toast-line {
+  font-size: 13px;
+  color: #3a5634;
+}
+.tossful-calc .save-toast-link {
+  font-size: 13px;
+  color: #0F563D;
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
