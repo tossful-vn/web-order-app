@@ -52,6 +52,9 @@ export type StringTable = {
   macros_label: string; language_label: string; source_label: string;
   empty_alert: string;
   save_tip: string;
+  saved_toast: string;        // logged-in save confirmation
+  stamp_earning: string;      // phone_verified === true
+  stamp_verify: string;       // phone_verified === false → links /account
 };
 
 const EN: StringTable = {
@@ -121,6 +124,9 @@ const EN: StringTable = {
   macros_label: "Macros", language_label: "Language", source_label: "Source",
   empty_alert: "Your bowl is empty. Pick a few ingredients first.",
   save_tip: "Tip: screenshot to save or share. Thanks for trying Tossful!",
+  saved_toast: "Saved!",
+  stamp_earning: "Your store orders are earning Magic Stamps.",
+  stamp_verify: "Verify your phone to start earning stamps →",
 };
 
 // === Vietnamese strings (constants up top per session-lessons gotcha) ===
@@ -203,6 +209,9 @@ const VI_back_to_start = "Quay lại";
 const VI_browse_h = "Chọn một tô signature";
 const VI_browse_sub = "Chạm vào một tô để nạp, sau đó tùy chỉnh ở bước tiếp theo.";
 const VI_save_tip = "Mẹo: chụp màn hình để lưu hoặc chia sẻ. Cảm ơn bạn đã thử Tossful!";
+const VI_saved_toast = "Đã lưu!";
+const VI_stamp_earning = "Đơn tại quầy của bạn đang tích tem Magic Stamp.";
+const VI_stamp_verify = "Xác minh số điện thoại để bắt đầu tích tem →";
 
 const VI: StringTable = {
   page_title: VI_page_title, page_subtitle: VI_page_subtitle,
@@ -256,6 +265,9 @@ const VI: StringTable = {
   ingredients_label: VI_ingredients_label, macros_label: VI_macros_label,
   language_label: VI_language_label, source_label: VI_source_label,
   empty_alert: VI_empty_alert, save_tip: VI_save_tip,
+  saved_toast: VI_saved_toast,
+  stamp_earning: VI_stamp_earning,
+  stamp_verify: VI_stamp_verify,
 };
 
 export const I18N: Record<Lang, StringTable> = { en: EN, vi: VI };
