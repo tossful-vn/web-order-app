@@ -301,3 +301,48 @@
 .ingredient-modal {
   max-width: 420px;
 }
+
+/* ── Tester dev control (TSK-147c) — us-only surface, never shown to customers.
+   Rendered only when profiles.role === 'tester'. ── */
+.stamp-dev-control {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px dashed rgba(15, 86, 61, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.stamp-dev-tag {
+  font-size: 9px;
+  letter-spacing: 0.8px;
+  font-weight: 600;
+  color: #fff;
+  background: #7D291A;
+  padding: 2px 7px;
+  border-radius: 999px;
+}
+.stamp-dev-buttons {
+  display: inline-flex;
+  gap: 6px;
+}
+.stamp-dev-btn {
+  min-width: 44px;
+  padding: 5px 12px;
+  border-radius: 8px;
+  border: 1px solid #0F563D;
+  background: #fff;
+  color: #0F563D;
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+.stamp-dev-btn:hover:not(:disabled) {
+  background: #eef4ec;
+}
+.stamp-dev-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

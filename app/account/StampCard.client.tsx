@@ -11,6 +11,8 @@ type Props = {
   entries: StampEntry[];
   /** Whether this account has a verified phone (stamps can attach). */
   hasVerifiedPhone: boolean;
+  /** Tester account (TSK-147c): shows the +1/-1/Reset dev control. */
+  isTester?: boolean;
   lang: "en" | "vi";
 };
 
@@ -155,15 +157,61 @@ function slotIngredient(slot: number, entries: StampEntry[]): IngredientKey {
   return INGREDIENT_POOL[(slot - 1) % INGREDIENT_POOL.length];
 }
 
-export default function StampCardComponent({ card, entries, hasVerifiedPhone, lang }: Props) {
+export default function StampCardComponent({
+  card: cardProp,
+  entries: entriesProp,
+  hasVerifiedPhone,
+  isTester = false,
+  lang,
+}: Props) {
   const s = STRINGS[lang];
   const [infographic, setInfographic] = useState<{ ingredient: TappableIngredient; stampNumber: number } | null>(null);
+
+  // Testers mutate the card live via the dev control, so card/entries are local
+  // state seeded from the server props (re-rendered from each API response).
+  const [card, setCard] = useState(cardProp);
+  const [entries, setEntries] = useState(entriesProp);
+  const [busy, setBusy] = useState(false);
+
+  /** POST a tester action and re-render the card from the response. */
+  async function devAction(action: "add_test_stamp" | "remove_test_stamp" | "reset_test_card") {
+    if (busy) return;
+    setBusy(true);
+    try {
+      // +1 on a fresh account needs a card first; mint one then stamp it.
+      if (action === "add_test_stamp" && !card) {
+        const ensure = await fetch("/api/loyalty", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ action: "ensure_card" }),
+        });
+        const ensured = await ensure.json();
+        if (ensure.ok && ensured.card) {
+          setCard(ensured.card);
+          setEntries(ensured.entries ?? []);
+        }
+      }
+      const res = await fetch("/api/loyalty", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      const data = await res.json();
+      if (res.ok && data.card) {
+        setCard(data.card);
+        setEntries(data.entries ?? []);
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
 
   const stampsCollected = Math.min(card?.stamps_collected ?? 0, STAMPS_REQUIRED);
   const isFull = stampsCollected >= STAMPS_REQUIRED || card?.reward_status === "reward_ready";
 
-  /* ── State 1: no verified phone — stamps can't attach yet ── */
-  if (!hasVerifiedPhone) {
+  /* ── State 1: no verified phone — stamps can't attach yet ──
+   * Testers always get the real card so the dev control can drive the UX. */
+  if (!hasVerifiedPhone && !isTester) {
     return (
       <div className="stamp-card stamp-card-message">
         <div className="stamp-message-mascot" aria-hidden="true">
@@ -246,6 +294,40 @@ export default function StampCardComponent({ card, entries, hasVerifiedPhone, la
           <p className="font-body text-sm text-[#0F563D] font-medium">{s.progress(stampsCollected)}</p>
         )}
       </div>
+
+      {/* Tester dev control (TSK-147c) — only rendered for role='tester'.
+          Absent for everyone else; the customer flow is byte-identical. */}
+      {isTester && (
+        <div className="stamp-dev-control" role="group" aria-label="Tester controls">
+          <span className="stamp-dev-tag font-body">TESTER</span>
+          <div className="stamp-dev-buttons">
+            <button
+              type="button"
+              className="stamp-dev-btn"
+              onClick={() => devAction("add_test_stamp")}
+              disabled={busy || isFull}
+            >
+              +1
+            </button>
+            <button
+              type="button"
+              className="stamp-dev-btn"
+              onClick={() => devAction("remove_test_stamp")}
+              disabled={busy || stampsCollected <= 0}
+            >
+              −1
+            </button>
+            <button
+              type="button"
+              className="stamp-dev-btn"
+              onClick={() => devAction("reset_test_card")}
+              disabled={busy || (stampsCollected === 0 && card?.reward_status === "collecting")}
+            >
+              Reset
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Ingredient infographic (read-only tap on a collected stamp) */}
       {infographic && (

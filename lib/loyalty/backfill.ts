@@ -30,6 +30,8 @@ export type BackfillSummary = {
   byoBowlsLinked: number;
   /** ipos_orders rows newly linked to the profile (phone match, was unlinked). */
   iposOrdersLinked: number;
+  /** ipos_order_items rows newly linked to the profile (phone match, unlinked). */
+  orderItemsLinked: number;
 };
 
 /** The narrow set of DB operations the back-fill needs. */
@@ -46,6 +48,12 @@ export interface BackfillStore {
    * mint stamps — pre-verification orders never earn (TSK-155).
    */
   linkIposOrdersByPhone(phone: string, profileId: string): Promise<number>;
+  /**
+   * Link captured iPOS order items whose phone matches and that aren't yet
+   * linked. Returns the number of rows linked. Idempotent (re-run links 0).
+   * Pure taste/history data (TSK-172) — like BYO, ALL of it links on verify.
+   */
+  linkOrderItemsByPhone(phone: string, profileId: string): Promise<number>;
 }
 
 /**
@@ -60,7 +68,8 @@ export async function backfillForVerifiedPhone(
 ): Promise<BackfillSummary> {
   const byoBowlsLinked = await store.linkByoBowlsByPhone(phone, profileId);
   const iposOrdersLinked = await store.linkIposOrdersByPhone(phone, profileId);
-  return { byoBowlsLinked, iposOrdersLinked };
+  const orderItemsLinked = await store.linkOrderItemsByPhone(phone, profileId);
+  return { byoBowlsLinked, iposOrdersLinked, orderItemsLinked };
 }
 
 /* ───────────────────────── Supabase adapter ───────────────────────── */
@@ -93,6 +102,19 @@ export function createSupabaseBackfillStore(
         .is("profile_id", null)
         .select("id");
       if (error) throw new Error(`linkIposOrdersByPhone failed: ${error.message}`);
+      return data?.length ?? 0;
+    },
+
+    async linkOrderItemsByPhone(phone, profileId) {
+      // Same idempotency shape: only unlinked rows are touched. Pure taste data
+      // (TSK-172) — all of it links on verify, like BYO bowls.
+      const { data, error } = await supabase
+        .from("ipos_order_items")
+        .update({ profile_id: profileId })
+        .eq("phone", phone)
+        .is("profile_id", null)
+        .select("id");
+      if (error) throw new Error(`linkOrderItemsByPhone failed: ${error.message}`);
       return data?.length ?? 0;
     },
   };

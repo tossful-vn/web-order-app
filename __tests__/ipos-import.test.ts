@@ -18,6 +18,7 @@ import { IPOS_STORE_UIDS } from "@/lib/ipos/parseEodOrders";
 import type { StampStore, CardRow, VerifiedAccount } from "@/lib/ipos/applyStamps";
 import type { IposOrderStore, NewIposOrder } from "@/lib/ipos/applyIposOrders";
 import type { ByoStore, NewBowl, NewIngredient } from "@/lib/ipos/applyByoBowls";
+import type { OrderItemStore, NewOrderItem } from "@/lib/ipos/applyOrderItems";
 import { STAMPS_REQUIRED } from "@/lib/types/loyalty";
 import {
   runIposImport,
@@ -76,6 +77,8 @@ function memImportStores(verifiedAt: number | null = 0) {
   const bowls: NewBowl[] = [];
   const ingredients: NewIngredient[] = [];
   let bowlSeq = 0;
+  // order-items store
+  const items: NewOrderItem[] = [];
 
   const stampStore: StampStore = {
     async findVerifiedAccountByPhone(phone): Promise<VerifiedAccount | null> {
@@ -143,6 +146,22 @@ function memImportStores(verifiedAt: number | null = 0) {
     },
   };
 
+  const itemStore: OrderItemStore = {
+    async findProfileIdByPhone(phone) {
+      return phone === PHONE && verifiedAt !== null ? "user-1" : null;
+    },
+    async hasItemForLineId(lineId) {
+      return items.some((i) => i.ipos_line_id === lineId);
+    },
+    async insertItem(item) {
+      if (items.some((i) => i.ipos_line_id === item.ipos_line_id)) {
+        return { ok: false, duplicate: true };
+      }
+      items.push(item);
+      return { ok: true };
+    },
+  };
+
   const stores: ImportStores = {
     async resolveStoreId(code) {
       return code === STORE_CODE ? STORE_ID : null;
@@ -150,9 +169,10 @@ function memImportStores(verifiedAt: number | null = 0) {
     orderStore,
     stampStore,
     byoStore,
+    itemStore,
   };
 
-  return { stores, cards, entries, orders, bowls, ingredients };
+  return { stores, cards, entries, orders, bowls, ingredients, items };
 }
 
 /* ───────────────────────── orchestration ───────────────────────── */
@@ -170,11 +190,14 @@ test("runIposImport — happy path: orders + stamps + BYO in one pass", async ()
   assert.equal(summary.byo_bowls, 2);
   assert.equal(summary.byo_ingredients, 4); // 2 toppings × 2 bowls
   assert.equal(summary.modifiers_flagged, 2); // one SERVICE_ line per bowl
+  assert.equal(summary.order_items, 2); // one sale_detail line per order
+  assert.equal(summary.order_items_products, 2); // both are real (non-modifier) lines
 
   assert.equal(mem.entries.length, 2);
   assert.equal(mem.orders.length, 2);
   assert.equal(mem.bowls.length, 2);
   assert.equal(mem.ingredients.length, 4);
+  assert.equal(mem.items.length, 2);
 });
 
 test("runIposImport — idempotent: POST twice = same counts, no dupes", async () => {
@@ -184,20 +207,24 @@ test("runIposImport — idempotent: POST twice = same counts, no dupes", async (
   assert.equal(first.stamps_inserted, 2);
   assert.equal(first.orders_persisted, 2);
   assert.equal(first.byo_bowls, 2);
+  assert.equal(first.order_items, 2);
 
   const second = await runIposImport(mem.stores, "HN" as IposStoreKey, FIXTURE);
   assert.equal(second.stamps_inserted, 0, "no new stamps on re-import");
   assert.equal(second.orders_persisted, 0, "no new orders on re-import");
   assert.equal(second.byo_bowls, 0, "no new bowls on re-import");
+  assert.equal(second.order_items, 0, "no new items on re-import");
   assert.equal(second.skipped.stamps_existing, 2);
   assert.equal(second.skipped.orders_existing, 2);
   assert.equal(second.skipped.byo_existing, 2);
+  assert.equal(second.skipped.items_existing, 2);
 
   // The store contents are unchanged after the second run.
   assert.equal(mem.entries.length, 2);
   assert.equal(mem.orders.length, 2);
   assert.equal(mem.bowls.length, 2);
   assert.equal(mem.ingredients.length, 4);
+  assert.equal(mem.items.length, 2);
 });
 
 test("runIposImport — unknown store code surfaces StoreNotFoundError", async () => {

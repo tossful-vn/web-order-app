@@ -33,6 +33,12 @@ import {
   createSupabaseByoStore,
   type ByoStore,
 } from "@/lib/ipos/applyByoBowls";
+import { parseOrderItems } from "@/lib/ipos/parseOrderItems";
+import {
+  applyOrderItems,
+  createSupabaseOrderItemStore,
+  type OrderItemStore,
+} from "@/lib/ipos/applyOrderItems";
 
 /**
  * Request store key → iPOS `store_uid` + the `stores.code` used to resolve
@@ -57,6 +63,7 @@ export type ImportStores = {
   orderStore: IposOrderStore;
   stampStore: StampStore;
   byoStore: ByoStore;
+  itemStore: OrderItemStore;
 };
 
 /** Thrown when the store code can't be resolved — surfaced as a 404 by the route. */
@@ -79,6 +86,10 @@ export type IposImportSummary = {
   byo_bowls: number;
   byo_ingredients: number;
   modifiers_flagged: number;
+  /** New `ipos_order_items` rows captured this run (idempotent on ipos_line_id). */
+  order_items: number;
+  /** Real (non-modifier) menu lines seen — the "products sold" count. */
+  order_items_products: number;
   /** Per-stage skip breakdown (the bulk of these are idempotency hits on re-POST). */
   skipped: {
     orders_existing: number;
@@ -89,6 +100,8 @@ export type IposImportSummary = {
     stamps_undated: number;
     byo_existing: number;
     byo_undated: number;
+    items_existing: number;
+    items_undated: number;
   };
 };
 
@@ -113,12 +126,15 @@ export async function runIposImport(
   // 1. Parse (pure, no DB). Wrong-store rows are dropped against expectedStoreUid.
   const { orders, stats } = parseEodOrders(raw, storeId, storeUid);
   const byo = parseByoBowls(raw, storeId, storeUid);
+  const orderItems = parseOrderItems(raw, storeId, storeUid);
 
-  // 2. Persist every attributable order, mint stamps for verified accounts, and
-  //    archive BYO bowls — all idempotent on their respective iPOS keys.
+  // 2. Persist every attributable order, mint stamps for verified accounts,
+  //    archive BYO bowls, and capture every sale line — all idempotent on their
+  //    respective iPOS keys.
   const orderSummary = await applyIposOrders(stores.orderStore, orders);
   const stampSummary = await applyStamps(stores.stampStore, orders);
   const byoSummary = await applyByoBowls(stores.byoStore, byo.bowls);
+  const itemSummary = await applyOrderItems(stores.itemStore, orderItems.items);
 
   return {
     store: storeKey,
@@ -130,6 +146,8 @@ export async function runIposImport(
     byo_bowls: byoSummary.inserted,
     byo_ingredients: byoSummary.ingredients,
     modifiers_flagged: byo.stats.modifierIngredients,
+    order_items: itemSummary.inserted,
+    order_items_products: orderItems.stats.realLines,
     skipped: {
       orders_existing: orderSummary.skippedExisting,
       orders_undated: orderSummary.skippedUndated,
@@ -139,6 +157,8 @@ export async function runIposImport(
       stamps_undated: stampSummary.skippedUndated,
       byo_existing: byoSummary.skippedExisting,
       byo_undated: byoSummary.skippedUndated,
+      items_existing: itemSummary.skippedExisting,
+      items_undated: itemSummary.skippedUndated,
     },
   };
 }
@@ -160,5 +180,6 @@ export function createSupabaseImportStores(supabase: SupabaseClient): ImportStor
     orderStore: createSupabaseIposOrderStore(supabase),
     stampStore: createSupabaseStampStore(supabase),
     byoStore: createSupabaseByoStore(supabase),
+    itemStore: createSupabaseOrderItemStore(supabase),
   };
 }
