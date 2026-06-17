@@ -227,14 +227,16 @@ test("sendZnsOtp — mocks (logs + ok) when no creds in env", async () => {
 
 type Bowl = { id: string; phone: string | null; profile_id: string | null };
 type Order = { tran_id: string; phone: string | null; profile_id: string | null };
+type Item = { id: string; phone: string | null; profile_id: string | null };
 
 /**
- * In-memory BackfillStore over byo_bowls + ipos_orders rows. On verify it LINKS
- * matching unlinked rows onto the profile (for history). It mints NO stamps —
- * earning starts at phone_verified_at (TSK-155), enforced in applyStamps, not here.
+ * In-memory BackfillStore over byo_bowls + ipos_orders + ipos_order_items rows.
+ * On verify it LINKS matching unlinked rows onto the profile (for history). It
+ * mints NO stamps — earning starts at phone_verified_at (TSK-155), enforced in
+ * applyStamps, not here.
  */
-function memBackfill(opts: { bowls: Bowl[]; orders: Order[] }) {
-  const { bowls, orders } = opts;
+function memBackfill(opts: { bowls: Bowl[]; orders: Order[]; items: Item[] }) {
+  const { bowls, orders, items } = opts;
 
   const store: BackfillStore = {
     async linkByoBowlsByPhone(phone, profileId) {
@@ -257,12 +259,22 @@ function memBackfill(opts: { bowls: Bowl[]; orders: Order[] }) {
       }
       return n;
     },
+    async linkOrderItemsByPhone(phone, profileId) {
+      let n = 0;
+      for (const it of items) {
+        if (it.phone === phone && it.profile_id == null) {
+          it.profile_id = profileId;
+          n++;
+        }
+      }
+      return n;
+    },
   };
-  return { store, bowls, orders };
+  return { store, bowls, orders, items };
 }
 
 test("backfillForVerifiedPhone — links bowls + orders (no stamps), idempotent on re-run", async () => {
-  const { store, bowls, orders } = memBackfill({
+  const { store, bowls, orders, items } = memBackfill({
     bowls: [
       { id: "b1", phone: PHONE, profile_id: null }, // match → link
       { id: "b2", phone: PHONE, profile_id: null }, // match → link
@@ -276,11 +288,18 @@ test("backfillForVerifiedPhone — links bowls + orders (no stamps), idempotent 
       { tran_id: "o3", phone: PHONE, profile_id: null }, // match → link (history only)
       { tran_id: "o4", phone: "0900000001", profile_id: null }, // other phone → skip
     ],
+    items: [
+      { id: "i1", phone: PHONE, profile_id: null }, // match → link (taste/history)
+      { id: "i2", phone: PHONE, profile_id: null }, // match → link (taste/history)
+      { id: "i3", phone: PHONE, profile_id: "other" }, // already linked → skip
+      { id: "i4", phone: "0900000001", profile_id: null }, // other phone → skip
+    ],
   });
 
   const first = await backfillForVerifiedPhone(store, PHONE, "me");
   assert.equal(first.byoBowlsLinked, 2, "two phone-only bowls linked");
   assert.equal(first.iposOrdersLinked, 3, "three persisted orders linked for history");
+  assert.equal(first.orderItemsLinked, 2, "two phone-only order items linked");
   // No stampsBackfilled field exists — verification never mints retroactive stamps.
   assert.equal(
     Object.prototype.hasOwnProperty.call(first, "stampsBackfilled"),
@@ -291,7 +310,11 @@ test("backfillForVerifiedPhone — links bowls + orders (no stamps), idempotent 
   assert.equal(bowls.find((b) => b.id === "b3")!.profile_id, "other", "existing link untouched");
   assert.equal(orders.find((o) => o.tran_id === "o4")!.profile_id, null, "other phone untouched");
 
+  assert.equal(items.find((i) => i.id === "i1")!.profile_id, "me");
+  assert.equal(items.find((i) => i.id === "i3")!.profile_id, "other", "existing link untouched");
+
   const second = await backfillForVerifiedPhone(store, PHONE, "me");
   assert.equal(second.byoBowlsLinked, 0, "re-verify links no new bowls");
   assert.equal(second.iposOrdersLinked, 0, "re-verify links no new orders");
+  assert.equal(second.orderItemsLinked, 0, "re-verify links no new items");
 });

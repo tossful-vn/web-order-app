@@ -23,7 +23,7 @@ export async function generateMetadata() {
 export default async function LoyaltyPage() {
   const lang = getServerLang();
   const s = STRINGS[lang];
-  const { card, entries, hasVerifiedPhone } = await getStampCardView();
+  const { card, entries, hasVerifiedPhone, isTester } = await getStampCardView();
 
   return (
     <div className="space-y-6 p-6 max-w-3xl mx-auto w-full">
@@ -36,6 +36,7 @@ export default async function LoyaltyPage() {
         card={card}
         entries={entries}
         hasVerifiedPhone={hasVerifiedPhone}
+        isTester={isTester}
         lang={lang}
       />
     </div>

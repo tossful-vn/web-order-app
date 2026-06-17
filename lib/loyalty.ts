@@ -54,15 +54,17 @@ export async function getStampCardView(): Promise<{
   card: StampCard | null;
   entries: StampEntry[];
   hasVerifiedPhone: boolean;
+  /** Tester accounts (profiles.role === 'tester') get the +1/-1/Reset dev control. */
+  isTester: boolean;
 }> {
   const supabase = createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { card: null, entries: [], hasVerifiedPhone: false };
+  if (!user) return { card: null, entries: [], hasVerifiedPhone: false, isTester: false };
 
   const [{ data: profile }, active] = await Promise.all([
-    supabase.from("profiles").select("phone").eq("id", user.id).maybeSingle(),
+    supabase.from("profiles").select("phone, role").eq("id", user.id).maybeSingle(),
     getActiveStampCard(),
   ]);
 
@@ -70,5 +72,6 @@ export async function getStampCardView(): Promise<{
     card: active?.card ?? null,
     entries: active?.entries ?? [],
     hasVerifiedPhone: !!profile?.phone,
+    isTester: profile?.role === "tester",
   };
 }

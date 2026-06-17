@@ -37,6 +37,8 @@ export type VerifyPhoneResult =
       byoBowlsLinked: number;
       /** iPOS orders linked to the account (TSK-155 Option B persistence). */
       iposOrdersLinked: number;
+      /** iPOS order items linked to the account (TSK-172 taste/history capture). */
+      orderItemsLinked: number;
     }
   | { ok: false; error: string };
 
@@ -155,5 +157,6 @@ export async function verifyPhoneOtpAction(
     maskedPhone: maskPhone(phone),
     byoBowlsLinked: summary.byoBowlsLinked,
     iposOrdersLinked: summary.iposOrdersLinked,
+    orderItemsLinked: summary.orderItemsLinked,
   };
 }

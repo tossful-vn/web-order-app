@@ -24,6 +24,11 @@ import {
 } from "@/lib/ipos/applyIposOrders";
 import { parseByoBowls } from "@/lib/ipos/parseByoBowls";
 import { applyByoBowls, createSupabaseByoStore } from "@/lib/ipos/applyByoBowls";
+import { parseOrderItems } from "@/lib/ipos/parseOrderItems";
+import {
+  applyOrderItems,
+  createSupabaseOrderItemStore,
+} from "@/lib/ipos/applyOrderItems";
 
 /** CLI store key → iPOS store_uid + the `stores.code` used to resolve stores.id. */
 const STORE_CONFIG = {
@@ -91,6 +96,9 @@ async function main() {
   // BYO archive (TSK-153) — independent of the stamp pipeline, same file.
   const byo = parseByoBowls(raw, storeId, storeUid);
 
+  // Order-items capture (TSK-172) — every sale line, same file.
+  const orderItems = parseOrderItems(raw, storeId, storeUid);
+
   console.log(`\n── iPOS EOD parse (${storeKey}) ──`);
   console.log(`  read .............. ${stats.read}`);
   console.log(`  attributable ...... ${stats.attributable}`);
@@ -113,6 +121,17 @@ async function main() {
   console.log(
     `  modifier classes .. ${byo.stats.modifierItemIds.join(", ") || "(none seen)"}`,
   );
+
+  console.log(`\n── Order-items parse (${storeKey}) ──`);
+  console.log(`  lines ............. ${orderItems.stats.linesFound}`);
+  console.log(`  items parsed ...... ${orderItems.stats.itemsParsed}`);
+  console.log(`  real items ........ ${orderItems.stats.realLines}`);
+  console.log(`  modifier lines .... ${orderItems.stats.modifierLines}`);
+  console.log(`  attributable ...... ${orderItems.stats.attributable}`);
+  console.log(`  phoneless ......... ${orderItems.stats.phoneless}`);
+  console.log(`  distinct phones ... ${orderItems.stats.distinctPhones}`);
+  console.log(`  undated (skipped) . ${orderItems.stats.undated}`);
+  console.log(`  dropped (no lineid) ${orderItems.stats.droppedNoLineId}`);
 
   if (dryRun) {
     console.log(
@@ -171,9 +190,23 @@ async function main() {
   console.log(`  skipped (undated) . ${byoSummary.skippedUndated}`);
   if (byoSummary.errors) console.log(`  errors ............ ${byoSummary.errors}`);
 
+  // 6. Capture every sale line (idempotent on ipos_line_id). Keeps unattributed.
+  const itemStore = createSupabaseOrderItemStore(supabase!);
+  const itemSummary = await applyOrderItems(itemStore, orderItems.items);
+
+  console.log(`\n── Order-items apply ──`);
+  console.log(`  items ............. ${itemSummary.items}`);
+  console.log(`  inserted .......... ${itemSummary.inserted}`);
+  console.log(`  linked to profile . ${itemSummary.linkedToProfile}`);
+  console.log(`  phone only ........ ${itemSummary.phoneOnly}`);
+  console.log(`  anonymous ......... ${itemSummary.anonymous}`);
+  console.log(`  skipped (existing)  ${itemSummary.skippedExisting}`);
+  console.log(`  skipped (undated) . ${itemSummary.skippedUndated}`);
+  if (itemSummary.errors) console.log(`  errors ............ ${itemSummary.errors}`);
+
   console.log(
-    `\n✓ done. Re-running this command persists 0 new orders, 0 new stamps and` +
-      ` 0 new bowls (idempotent on ipos_tran_id / tran_id / ipos_line_id).`,
+    `\n✓ done. Re-running this command persists 0 new orders, 0 new stamps,` +
+      ` 0 new bowls and 0 new items (idempotent on ipos_tran_id / tran_id / ipos_line_id).`,
   );
 }
 
