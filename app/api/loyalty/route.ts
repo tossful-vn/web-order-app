@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { INGREDIENT_POOL, STAMPS_REQUIRED } from "@/lib/types/loyalty";
 
 export async function POST(request: Request) {
@@ -13,6 +14,20 @@ export async function POST(request: Request) {
   if (authError || !user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  /* ── TOS-60: stamp writes are service-role only ──
+   * The RLS user client (`supabase`) is used for AUTH (getUser above) and every
+   * SELECT — those stay RLS-scoped so a row only comes back if it's the user's.
+   * But ALL WRITES (stamp_cards INSERT/UPDATE, stamp_entries INSERT/DELETE) go
+   * through the service-role `admin` client, and the customer-facing write
+   * policies have been dropped (2026-06-17_stamp-writes-service-role-only.sql).
+   * That removes the self-grant hole: a customer could previously bump their own
+   * stamp count via the Supabase JS client under "Users update own cards" /
+   * "System inserts stamps". `admin` BYPASSES RLS, so every write below MUST be
+   * explicitly fenced to `user.id` in code — that guard is now the only fence.
+   * Cards are always read first through the RLS client, so any `card.id` we then
+   * write by is already proven to belong to the authed user. */
+  const admin = createAdminClient();
 
   let body: Record<string, unknown>;
   try {
@@ -64,8 +79,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ card: existing, entries: entries ?? [] });
     }
 
-    // Create new card
-    const { data: newCard, error: insertErr } = await supabase
+    // Create new card (service-role write, explicitly owned by the authed user)
+    const { data: newCard, error: insertErr } = await admin
       .from("stamp_cards")
       .insert({ user_id: user.id })
       .select()
@@ -100,8 +115,9 @@ export async function POST(request: Request) {
     const nextStampNum = card.stamps_collected + 1;
     const ingredient = INGREDIENT_POOL[(nextStampNum - 1) % INGREDIENT_POOL.length];
 
-    // Insert the stamp entry
-    const { error: entryErr } = await supabase.from("stamp_entries").insert({
+    // Insert the stamp entry (service-role write; card.id was read above through
+    // the RLS client, so it is proven to belong to the authed user).
+    const { error: entryErr } = await admin.from("stamp_entries").insert({
       card_id: card.id,
       stamp_number: nextStampNum,
       ingredient_key: ingredient,
@@ -111,7 +127,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: entryErr.message }, { status: 500 });
     }
 
-    // Update the card
+    // Update the card (service-role write, fenced to the authed user's card)
     const isComplete = nextStampNum >= STAMPS_REQUIRED;
     const updateFields: Record<string, unknown> = { stamps_collected: nextStampNum };
     if (isComplete) {
@@ -120,10 +136,11 @@ export async function POST(request: Request) {
       updateFields.reward_expires_at = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
     }
 
-    const { data: updatedCard, error: updateErr } = await supabase
+    const { data: updatedCard, error: updateErr } = await admin
       .from("stamp_cards")
       .update(updateFields)
       .eq("id", card.id)
+      .eq("user_id", user.id)
       .select()
       .single();
 
@@ -161,7 +178,8 @@ export async function POST(request: Request) {
     }
 
     // Delete the highest stamp entry, then decrement the counter (floor 0).
-    const { error: delErr } = await supabase
+    // Service-role write; card.id was read above through the RLS client.
+    const { error: delErr } = await admin
       .from("stamp_entries")
       .delete()
       .eq("card_id", card.id)
@@ -180,10 +198,11 @@ export async function POST(request: Request) {
       updateFields.reward_expires_at = null;
     }
 
-    const { data: updatedCard, error: updateErr } = await supabase
+    const { data: updatedCard, error: updateErr } = await admin
       .from("stamp_cards")
       .update(updateFields)
       .eq("id", card.id)
+      .eq("user_id", user.id)
       .select()
       .single();
 
@@ -216,7 +235,8 @@ export async function POST(request: Request) {
     }
 
     // Clear all entries, then zero the card back to a fresh collecting state.
-    const { error: delErr } = await supabase
+    // Service-role writes; card.id was read above through the RLS client.
+    const { error: delErr } = await admin
       .from("stamp_entries")
       .delete()
       .eq("card_id", card.id);
@@ -225,7 +245,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: delErr.message }, { status: 500 });
     }
 
-    const { data: updatedCard, error: updateErr } = await supabase
+    const { data: updatedCard, error: updateErr } = await admin
       .from("stamp_cards")
       .update({
         stamps_collected: 0,
@@ -236,6 +256,7 @@ export async function POST(request: Request) {
         reward_redeemed_at: null,
       })
       .eq("id", card.id)
+      .eq("user_id", user.id)
       .select()
       .single();
 
@@ -267,8 +288,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No reward-ready card found" }, { status: 404 });
     }
 
-    // Mark as redeemed
-    const { data: redeemedCard, error: updateErr } = await supabase
+    // Mark as redeemed (service-role write, fenced to the authed user's card)
+    const { data: redeemedCard, error: updateErr } = await admin
       .from("stamp_cards")
       .update({
         reward_choice: choice,
@@ -276,6 +297,7 @@ export async function POST(request: Request) {
         reward_status: "redeemed",
       })
       .eq("id", readyCard.id)
+      .eq("user_id", user.id)
       .select()
       .single();
 
@@ -283,8 +305,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: updateErr.message }, { status: 500 });
     }
 
-    // Create a new card for the next cycle
-    const { data: newCard, error: newErr } = await supabase
+    // Create a new card for the next cycle (service-role write, owned by user)
+    const { data: newCard, error: newErr } = await admin
       .from("stamp_cards")
       .insert({ user_id: user.id })
       .select()
