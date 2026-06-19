@@ -12,8 +12,8 @@
  *   - NO allergen Q&A. The one allergen-shaped FAQ entry deliberately answers with
  *     the staff-redirect line — allergen data is not ready (see ALLERGEN_REDIRECT).
  *
- * Store-specific facts (address / hours) live in STORE_INFO so Hieu can edit them
- * in ONE place. They are marked TODO until the real values are filled in.
+ * Store-specific facts (address / phone / hours) live in STORE_INFO so Hieu can
+ * edit them in ONE place.
  */
 import type { Lang } from "@/lib/lang";
 
@@ -28,28 +28,29 @@ export function pick(s: I18n, lang: Lang): string {
 }
 
 /* ─────────────────────────── Store facts ───────────────────────────
- * CH1 = Hà Nội, CH2 = HCM (see lib/ipos/importEod.ts STORE_CODES).
- * TODO(hieu): fill in the real address + hours; placeholders ship until then. */
+ * CH1 = Hà Nội, CH2 = HCM (see lib/ipos/importEod.ts STORE_CODES). */
 export const STORE_INFO = {
   ch1: {
     code: "CH1",
     city: t("Hà Nội", "Hanoi"),
     address: t(
-      "CH1 Hà Nội — địa chỉ đang cập nhật.",
-      "CH1 Hanoi — address coming soon.",
+      "B1 - Capital Place, 29 Liễu Giai, Ba Đình, Hà Nội",
+      "B1 - Capital Place, 29 Lieu Giai, Ba Dinh, Hanoi",
     ),
+    phone: "082.856.5166",
   },
   ch2: {
     code: "CH2",
     city: t("TP. Hồ Chí Minh", "Ho Chi Minh City"),
     address: t(
-      "CH2 TP.HCM — địa chỉ đang cập nhật.",
-      "CH2 HCMC — address coming soon.",
+      "A1.10 Galleria Residences, Metropole Thủ Thiêm, TP.HCM",
+      "A1.10 Galleria Residences, Metropole Thu Thiem, HCMC",
     ),
+    phone: "082.545.0768",
   },
   hours: t(
-    "Giờ mở cửa đang được cập nhật — nhắn cửa hàng trên Zalo để chắc chắn nhé.",
-    "Opening hours are being updated — message the store on Zalo to be sure.",
+    "09:00 – 20:30 mỗi ngày (cả hai cửa hàng).",
+    "09:00 – 20:30 every day (both stores).",
   ),
 } as const;
 
@@ -149,8 +150,8 @@ export const FAQ_ENTRIES: FaqEntry[] = [
     key: "address",
     q: t("Địa chỉ cửa hàng?", "Store addresses?"),
     a: t(
-      `${STORE_INFO.ch1.address.vi}\n${STORE_INFO.ch2.address.vi}`,
-      `${STORE_INFO.ch1.address.en}\n${STORE_INFO.ch2.address.en}`,
+      `[Hà Nội] ${STORE_INFO.ch1.address.vi} · ☎ ${STORE_INFO.ch1.phone}\n[TP.HCM] ${STORE_INFO.ch2.address.vi} · ☎ ${STORE_INFO.ch2.phone}`,
+      `[Hanoi] ${STORE_INFO.ch1.address.en} · ☎ ${STORE_INFO.ch1.phone}\n[HCMC] ${STORE_INFO.ch2.address.en} · ☎ ${STORE_INFO.ch2.phone}`,
     ),
   },
   {
