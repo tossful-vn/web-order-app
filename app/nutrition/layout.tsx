@@ -1,23 +1,42 @@
 import { createClient } from "@/lib/supabase/server";
+import { getPreferredStore } from "@/lib/profile/preferred-store";
+import AppShell from "@/lib/components/AppShell.client";
 import MvpShell from "./MvpShell.client";
 
 /**
- * Minimal, anonymous-first layout for /nutrition (TSK-169, Option C).
+ * /nutrition shell selection (TSK-174 builds on TSK-169, Option C).
  *
- * Wraps the page in MvpShell (brand logo + EN/VI toggle + Beacons footer) —
- * NOT AppShell. There is no auth wall: the calculator works for guests. We
- * still resolve the Supabase session so the cookie is refreshed and downstream
- * client code can branch on logged-in vs anonymous, but no auth UI is rendered.
- * AppShell stays in place for /account, /byw, /loyalty.
+ * ANONYMOUS visitors keep the minimal, anonymous-first MvpShell (brand logo +
+ * EN/VI toggle + Beacons footer, NO nav) — this is the shareable marketing /
+ * SEO surface linked from beacons.ai/tossful, and it must stay untouched.
+ *
+ * LOGGED-IN visitors instead get the full AppShell: the app header/nav (so they
+ * can exit the calculator back into /account, /byw, /loyalty or home) plus the
+ * "Lá" chatbot. AppShell already hides Lá on the brand-site proxy
+ * (?src=brand-site), so that surface stays Lá-free.
+ *
+ * Auth is resolved the same way every AppShell layout does it (Supabase
+ * getUser + getPreferredStore), which also refreshes the @supabase/ssr cookie.
  */
 export default async function NutritionLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  // Touch the session so @supabase/ssr refreshes the auth cookie on navigation.
   const supabase = createClient();
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  return <MvpShell>{children}</MvpShell>;
+  if (!user) {
+    // Anonymous: unchanged TSK-169 marketing surface.
+    return <MvpShell>{children}</MvpShell>;
+  }
+
+  const preferredStore = await getPreferredStore(user.id);
+  return (
+    <AppShell user={{ email: user.email }} preferredStore={preferredStore}>
+      {children}
+    </AppShell>
+  );
 }

@@ -103,6 +103,7 @@ const EN: typeof VI = {
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import TossfulMascot from "@/lib/components/TossfulMascot";
 import type { Lang } from "@/lib/lang";
 import { createClient } from "@/lib/supabase/client";
 import { STAMPS_REQUIRED } from "@/lib/types/loyalty";
@@ -194,9 +195,12 @@ export default function LaChatbot({ user }: Props) {
           type="button"
           onClick={() => setOpen(true)}
           aria-label={s.launcher}
-          className="fixed bottom-4 right-4 z-40 w-14 h-14 rounded-full bg-kale-700 text-cream shadow-xl flex items-center justify-center active:scale-95 transition-transform"
+          className="fixed bottom-4 right-4 z-40 w-14 h-14 rounded-full bg-cream ring-2 ring-kale-700 shadow-xl flex items-center justify-center overflow-hidden active:scale-95 transition-transform"
         >
-          <i className="ti ti-leaf text-2xl" />
+          {/* Tossful mascot (TSK-175) — green silhouette on a cream disc with a
+              brand-palette ring; the full character is too dark to read on the
+              old kale fill. */}
+          <TossfulMascot className="w-11 h-11" />
         </button>
       )}
 
@@ -219,8 +223,10 @@ export default function LaChatbot({ user }: Props) {
                 <i className="ti ti-chevron-left text-lg" />
               </button>
             ) : (
-              <div className="w-9 h-9 rounded-full bg-cream/15 flex items-center justify-center shrink-0">
-                <i className="ti ti-leaf text-xl" />
+              <div className="w-9 h-9 rounded-full bg-cream overflow-hidden flex items-center justify-center shrink-0">
+                {/* Mascot avatar (TSK-175) — solid cream disc so the green
+                    character reads against the kale header. */}
+                <TossfulMascot className="w-8 h-8" />
               </div>
             )}
             <div className="flex-1 min-w-0">

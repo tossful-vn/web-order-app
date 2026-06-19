@@ -5,6 +5,7 @@ import "./stamp-card.css";
 import type { StampCard, StampEntry, IngredientKey } from "@/lib/types/loyalty";
 import { STAMPS_REQUIRED, REWARD_ITEM_NUMBER, INGREDIENT_POOL } from "@/lib/types/loyalty";
 import IngredientInfographic from "./IngredientInfographic.client";
+import TossfulMascot from "@/lib/components/TossfulMascot";
 
 type Props = {
   card: StampCard | null;
@@ -239,7 +240,10 @@ export default function StampCardComponent({
                 <span className="stamp-centre-free font-body">{s.free}</span>
               </>
             ) : (
-              <IngredientIcon ingredient="mascot" size={34} />
+              // Idle centre (TSK-176): the Tossful mascot on the white centre
+              // disc. Completion (9/9 gift + FREE) and the ring sizing/animation
+              // are unchanged; only this idle graphic swaps from the smiley.
+              <TossfulMascot className="w-12 h-12" />
             )}
           </div>
 
