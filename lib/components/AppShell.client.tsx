@@ -50,6 +50,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useLang, persistLang, type Lang } from "@/lib/lang";
 import { signOut } from "@/lib/auth/actions";
 import CityChip from "@/lib/components/CityChip.client";
+import LaChatbot from "@/lib/components/LaChatbot.client";
 import type { StoreCity } from "@/lib/types/database";
 
 type Props = {
@@ -341,6 +342,10 @@ function AppShellInner({ user, preferredStore = null, children }: Props) {
           </div>
         )}
       </aside>
+
+      {/* "Lá" deterministic chatbot (TSK-173). Authenticated app surface only —
+          hidden on the brand-site proxy, which is a separate Phase-1 surface. */}
+      {!isBrandSite && <LaChatbot user={user} />}
     </>
   );
 }
